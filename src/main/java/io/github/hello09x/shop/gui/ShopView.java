@@ -135,10 +135,13 @@ public final class ShopView implements InventoryHolder {
                 "&7回到" + (selling ? "收购" : "购买") + "分类列表"));
 
         // 4：当前分类
+        long visibleItems = shop.sortedItems().stream()
+                .filter(item -> item.permission() == null || viewer.hasPermission(item.permission()))
+                .count();
         inventory.setItem(4, button(shop.icon(),
                 (selling ? "&6&l" : "&a&l") + shop.name(),
                 "&7类型 &8| &f" + (selling ? "收购" : "购买"),
-                "&7商品 &8| &f" + shop.items().size() + " &7件"));
+                "&7商品 &8| &f" + visibleItems + " &7件"));
 
         // 8：回主菜单
         inventory.setItem(8, button(Material.NETHER_STAR,
@@ -244,8 +247,7 @@ public final class ShopView implements InventoryHolder {
         lore.add(Text.color(plugin.favorites().contains(viewer.getUniqueId(), item.key())
                 ? "&b❤ 已收藏"
                 : "&8❤ 未收藏"));
-        int inCart = plugin.cart().items(viewer.getUniqueId()).getOrDefault(item.key(), 0);
-        if (inCart > 0) {
+        int inCart = plugin.cart().items(viewer.getUniqueId()).getOrDefault(item.key(), 0);        if (inCart > 0) {
             lore.add(Text.color("&b购物车中 &f" + inCart + " &7件"));
         }
         lore.add(Text.color(GuiStyle.SEP));

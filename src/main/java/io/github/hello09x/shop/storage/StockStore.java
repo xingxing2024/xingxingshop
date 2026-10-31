@@ -138,8 +138,10 @@ public final class StockStore {
             if (!plugin.favorites().contains(player.getUniqueId(), item.key())) {
                 continue;
             }
-            Schedulers.entity(plugin, player, () -> player.sendMessage(Text.color(
-                    "&a[商店] &f" + item.displayName() + " &a已补货，当前库存 &f" + after)));
+            Schedulers.entity(plugin, player, () -> io.github.hello09x.shop.util.Notify.clickable(player,
+                    "&a[商店] &f" + item.displayName() + " &a已补货 &7库存 &f" + after + " &8[点击查看]",
+                    "/shop " + item.shopId(),
+                    "&7点击打开 &f" + shopName(item)));
         }
     }
 
@@ -149,9 +151,16 @@ public final class StockStore {
             if (!plugin.favorites().contains(player.getUniqueId(), item.key())) {
                 continue;
             }
-            Schedulers.entity(plugin, player, () -> player.sendMessage(Text.color(
-                    "&c[商店] &f" + item.displayName() + " &c已售罄")));
+            Schedulers.entity(plugin, player, () -> io.github.hello09x.shop.util.Notify.clickable(player,
+                    "&c[商店] &f" + item.displayName() + " &c已售罄 &8[点击查看]",
+                    "/shop " + item.shopId(),
+                    "&7点击打开 &f" + shopName(item)));
         }
+    }
+
+    private @NotNull String shopName(@NotNull ShopItem item) {
+        Shop shop = plugin.shops().get(item.shopId());
+        return shop == null ? item.shopId() : shop.name();
     }
 
     /**
@@ -173,6 +182,7 @@ public final class StockStore {
                 return;
             }
             List<String> names = new ArrayList<>();
+            int total = 0;
             for (String key : plugin.favorites().list(uuid)) {
                 int split = key.indexOf(':');
                 if (split <= 0) {
@@ -184,18 +194,22 @@ public final class StockStore {
                     continue;
                 }
                 if (item.isLimited() || item.isSellLimited()) {
-                    names.add(item.displayName());
-                }
-                if (names.size() >= 5) {
-                    break;
+                    total++;
+                    if (names.size() < 5) {
+                        names.add(item.displayName());
+                    }
                 }
             }
             limitNoticeDay.put(uuid, today);
             if (names.isEmpty()) {
                 return;
             }
-            player.sendMessage(Text.color("&a[商店] &7新的一天，收藏的 &f"
-                    + String.join("、", names) + " &7限购 / 限卖额度已刷新"));
+            String more = total > names.size() ? " &7等 &f" + total + " &7件" : "";
+            io.github.hello09x.shop.util.Notify.clickable(player,
+                    "&a[商店] &7新的一天，收藏的 &f" + String.join("、", names) + more
+                            + " &7限购 / 限卖额度已刷新 &8[打开收藏夹]",
+                    "/shop fav gui",
+                    "&7点击打开收藏夹");
         });
     }
 

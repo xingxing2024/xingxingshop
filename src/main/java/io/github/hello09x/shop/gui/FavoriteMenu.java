@@ -1,6 +1,7 @@
 package io.github.hello09x.shop.gui;
 
 import io.github.hello09x.shop.ShopPlugin;
+import io.github.hello09x.shop.currency.Currency;
 import io.github.hello09x.shop.shop.Shop;
 import io.github.hello09x.shop.shop.ShopItem;
 import io.github.hello09x.shop.util.Sounds;
@@ -64,17 +65,7 @@ public final class FavoriteMenu implements InventoryHolder {
         int to = Math.min(hits.size(), from + PAGE_SIZE);
         for (int i = from; i < to; i++) {
             Hit hit = hits.get(i);
-            ItemStack stack = hit.item.display();
-            ItemMeta meta = stack.getItemMeta();
-            if (meta != null) {
-                meta.setDisplayName(Text.color("&f" + hit.item.displayName()));
-                meta.setLore(List.of(
-                        Text.color("&7商店 &f" + hit.shop.name()),
-                        Text.color("&a➤ 点击进入商店")
-                ));
-                stack.setItemMeta(meta);
-            }
-            inventory.setItem(ITEM_START + i - from, stack);
+            inventory.setItem(ITEM_START + i - from, icon(hit));
         }
         if (hits.isEmpty()) {
             inventory.setItem(22, button(Material.BOOK, "&7收藏夹是空的",
@@ -109,6 +100,34 @@ public final class FavoriteMenu implements InventoryHolder {
                 plugin.gui().open(viewer, hits.get(index).shop);
             }
         }
+    }
+
+    private @NotNull ItemStack icon(@NotNull Hit hit) {
+        ItemStack stack = hit.item.display();
+        ItemMeta meta = stack.getItemMeta();
+        if (meta != null) {
+            boolean selling = hit.shop.type() == Shop.Type.SELL;
+            Currency currency = plugin.currencies().resolve(hit.item.currencyId());
+            double price = selling ? hit.item.sellPrice(viewer) : hit.item.buyPrice(viewer);
+            String priceText = currency == null
+                    ? Currency.formatNumber(price) : currency.format(price);
+            List<String> lore = new ArrayList<>();
+            meta.setDisplayName(Text.color("&f" + hit.item.displayName()));
+            lore.add(Text.color("&7商店 &f" + hit.shop.name()));
+            lore.add(Text.color("&7类型 &f" + (selling ? "收购" : "购买")));
+            lore.add(Text.color("&7价格 &e" + priceText));
+            if (hit.item.isLimitedStock()) {
+                int stock = hit.item.stock();
+                String color = stock <= 0 ? "&c" : stock <= Math.max(1, hit.item.maxStock()) / 4 ? "&e" : "&a";
+                lore.add(Text.color("&7库存 " + color + stock + "&7/&f" + hit.item.maxStock()));
+            }
+            lore.add(Text.color(GuiStyle.SEP));
+            lore.add(Text.color("&a➤ 点击进入商店"));
+            lore.add(Text.color("&8Shift+右键 在商店里取消收藏"));
+            meta.setLore(lore);
+            stack.setItemMeta(meta);
+        }
+        return stack;
     }
 
     private static ItemStack button(Material material, String name, String... lore) {

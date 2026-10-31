@@ -84,23 +84,25 @@ public final class MainMenu implements InventoryHolder {
 
         // 收藏夹
         int favorites = plugin.favorites().list(viewer.getUniqueId()).size();
-        inventory.setItem(FAVORITE_SLOT, icon(Material.HEART_OF_THE_SEA,
+        ItemStack favoriteIcon = icon(Material.HEART_OF_THE_SEA,
                 "&b&l❤ 我的收藏",
                 "&8" + "▬".repeat(10),
                 favorites == 0 ? "&7还没有收藏任何商品" : "&7已收藏 &f" + favorites + " &7件",
                 "",
                 favorites == 0
-                        ? "&8在商店里用 /shop fav add 添加"
-                        : "&b➤ 点击查看"));
+                        ? "&8在商店里用 Shift+右键 收藏"
+                        : "&b➤ 点击查看");
+        inventory.setItem(FAVORITE_SLOT, favorites > 0 ? GuiStyle.glow(favoriteIcon) : favoriteIcon);
 
         // 购物车
         int cartKinds = plugin.cart().items(viewer.getUniqueId()).size();
-        inventory.setItem(CART_SLOT, icon(Material.CHEST_MINECART,
+        ItemStack cartIcon = icon(Material.CHEST_MINECART,
                 "&b&l🛒 购物车",
                 "&8" + "▬".repeat(10),
                 cartKinds == 0 ? "&7购物车是空的" : "&7已选 &f" + cartKinds + " &7种商品",
                 "",
-                cartKinds == 0 ? "&8在商店里按 F 键加入" : "&b➤ 点击查看并结算"));
+                cartKinds == 0 ? "&8在商店里按 F 键加入" : "&b➤ 点击查看并结算");
+        inventory.setItem(CART_SLOT, cartKinds > 0 ? GuiStyle.glow(cartIcon) : cartIcon);
 
         // 余额
         var currency = plugin.currencies().getOrDefault(null);
