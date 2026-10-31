@@ -205,11 +205,13 @@ public final class ShopListMenu implements InventoryHolder {
         }
         if (slot == 45 + 3 && page > 1) {
             page--;
+            io.github.hello09x.shop.util.Sounds.play(viewer, "page");
             render();
             return;
         }
         if (slot == 45 + 5 && page < totalPages) {
             page++;
+            io.github.hello09x.shop.util.Sounds.play(viewer, "page");
             render();
             return;
         }

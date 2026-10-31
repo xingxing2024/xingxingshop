@@ -232,6 +232,7 @@ sound:
 
   # 界面交互
   click: ui.button.click          # 点击商品
+  page: item.book.page_turn       # 翻页
   cancel: ui.button.click         # 取消交易
   open: block.chest.open          # 打开商店
 

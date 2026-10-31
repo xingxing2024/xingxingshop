@@ -2,6 +2,7 @@ package io.github.hello09x.shop.gui;
 
 import io.github.hello09x.shop.ShopPlugin;
 import io.github.hello09x.shop.log.TransactionLog;
+import io.github.hello09x.shop.util.Sounds;
 import io.github.hello09x.shop.util.Text;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -105,9 +106,11 @@ public final class TransactionMenu implements InventoryHolder {
     public void onClick(int slot) {
         if (slot == 45 && page > 1) {
             page--;
+            Sounds.play(viewer, "page");
             render();
         } else if (slot == 53) {
             page++;
+            Sounds.play(viewer, "page");
             render();
         } else if (slot == 48) {
             render();

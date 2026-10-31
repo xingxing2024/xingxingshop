@@ -427,6 +427,7 @@ public final class ShopView implements InventoryHolder {
             case CONTROL + 3 -> {
                 if (page > 1) {
                     page--;
+                    io.github.hello09x.shop.util.Sounds.play(viewer, "page");
                     render();
                 }
             }
@@ -434,6 +435,7 @@ public final class ShopView implements InventoryHolder {
             case CONTROL + 5 -> {
                 if (page < totalPages) {
                     page++;
+                    io.github.hello09x.shop.util.Sounds.play(viewer, "page");
                     render();
                 }
             }
