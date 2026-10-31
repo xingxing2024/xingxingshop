@@ -14,6 +14,9 @@ softdepend:
   - Vault
   - PlaceholderAPI
   - PlayerPoints
+  - ItemsAdder
+  - Nexo
+  - MMOItems
 
 commands:
   shop:
