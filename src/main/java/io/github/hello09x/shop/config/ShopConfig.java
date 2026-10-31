@@ -52,6 +52,8 @@ public final class ShopConfig {
     private int dbPoolSize = 4;
     private int dbConnectionTimeout = 5000;
     private String dbTablePrefix = "";
+    private boolean dbDriverDownload = true;
+    private String dbDriverRepo = "https://maven.aliyun.com/repository/public";
 
     /** 交易日志 */
     private boolean logEnabled = true;
@@ -102,6 +104,10 @@ public final class ShopConfig {
                 f.getInt("database.mysql.connection-timeout", 5000)));
         String prefix = f.getString("database.table-prefix", "");
         this.dbTablePrefix = prefix != null && prefix.matches("[A-Za-z0-9_]{0,32}") ? prefix : "";
+        this.dbDriverDownload = f.getBoolean("database.driver-download", true);
+        String repo = f.getString("database.driver-repo", "https://maven.aliyun.com/repository/public");
+        this.dbDriverRepo = repo == null || repo.isBlank()
+                ? "https://maven.aliyun.com/repository/public" : repo.trim();
         // 老配置里写了完整 url 就继续用；没写就按 host/port/database 自动拼
         String explicitUrl = f.getString("database.mysql.url", "");
         this.dbUrl = explicitUrl == null || explicitUrl.isBlank()
@@ -159,6 +165,14 @@ public final class ShopConfig {
 
     public String dbTablePrefix() {
         return dbTablePrefix;
+    }
+
+    public boolean dbDriverDownload() {
+        return dbDriverDownload;
+    }
+
+    public String dbDriverRepo() {
+        return dbDriverRepo;
     }
 
     public boolean logEnabled() {

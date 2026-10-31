@@ -8,7 +8,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -16,6 +15,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -53,6 +53,8 @@ public final class TransactionDatabase {
     private String sqliteUrl;
     /** MySQL 连接池（跨服时复用连接，避免每笔交易重新握手） */
     private HikariDataSource mysqlPool;
+    /** 下载/加载的 JDBC 驱动 */
+    private DriverLoader driverLoader;
     private volatile boolean available;
 
     /** 单线程写入队列 */
@@ -109,6 +111,9 @@ public final class TransactionDatabase {
             closeMysql();
         }
         try {
+            if (driverLoader == null) {
+                driverLoader = DriverLoader.load(plugin, type == Type.MYSQL);
+            }
             if (type == Type.SQLITE) {
                 initSqlite();
             } else if (type == Type.MYSQL) {
@@ -128,9 +133,10 @@ public final class TransactionDatabase {
     private void initMysql() {
         var cfg = plugin.config();
         HikariConfig hc = new HikariConfig();
-        hc.setJdbcUrl(cfg.dbUrl());
-        hc.setUsername(cfg.dbUser());
-        hc.setPassword(cfg.dbPassword());
+        Properties props = new Properties();
+        props.setProperty("user", cfg.dbUser());
+        props.setProperty("password", cfg.dbPassword());
+        hc.setDataSource(new DriverLoader.DriverDataSource(driverLoader.driver(), cfg.dbUrl(), props));
         hc.setPoolName("XingXingShop-DB");
         hc.setMaximumPoolSize(plugin.config().dbPoolSize());
         hc.setMinimumIdle(1);
@@ -158,11 +164,10 @@ public final class TransactionDatabase {
 
     private void initSqlite() {
         try {
-            Class.forName("org.sqlite.JDBC");
             File file = new File(plugin.getDataFolder(), "transactions.db");
             sqliteUrl = "jdbc:sqlite:" + file.getAbsolutePath();
             // WAL 模式：读写并存；busy_timeout 防止偶发锁冲突直接报错
-            try (Connection c = DriverManager.getConnection(sqliteUrl);
+            try (Connection c = sqliteDriver().connect(sqliteUrl, new java.util.Properties());
                  Statement st = c.createStatement()) {
                 st.execute("PRAGMA journal_mode=WAL");
                 st.execute("PRAGMA synchronous=NORMAL");
@@ -173,6 +178,13 @@ public final class TransactionDatabase {
         }
     }
 
+    private java.sql.Driver sqliteDriver() {
+        if (driverLoader == null) {
+            throw new IllegalStateException("SQLite 驱动未加载");
+        }
+        return driverLoader.driver();
+    }
+
     /**
      * 取一条新连接（调用方负责关闭）
      */
@@ -181,7 +193,10 @@ public final class TransactionDatabase {
             if (sqliteUrl == null) {
                 initSqlite();
             }
-            Connection c = DriverManager.getConnection(sqliteUrl);
+            Connection c = sqliteDriver().connect(sqliteUrl, new java.util.Properties());
+            if (c == null) {
+                throw new SQLException("SQLite 驱动拒绝连接");
+            }
             c.setAutoCommit(true);
             try (Statement st = c.createStatement()) {
                 st.execute("PRAGMA busy_timeout=5000");
@@ -1390,6 +1405,10 @@ public final class TransactionDatabase {
             Thread.currentThread().interrupt();
         }
         closeMysql();
+        if (driverLoader != null) {
+            driverLoader.close();
+            driverLoader = null;
+        }
     }
 
 }
