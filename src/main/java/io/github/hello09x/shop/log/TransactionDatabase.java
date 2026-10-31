@@ -944,6 +944,60 @@ public final class TransactionDatabase {
     }
 
     /**
+     * 回滚一次 {@link #reserveBuy}（买入时扣款失败）。
+     *
+     * @param stockDelta 这次买入实际扣掉的库存数（可能因为库存上限而为 0）
+     */
+    public void releaseBuy(
+            @NotNull String shopId,
+            @NotNull String itemId,
+            @NotNull String playerUuid,
+            @NotNull String day,
+            @NotNull String itemKey,
+            int limit,
+            int quantity,
+            int stockDelta
+    ) {
+        if (quantity <= 0) {
+            return;
+        }
+        Connection conn = null;
+        try {
+            conn = connection();
+            conn.setAutoCommit(false);
+            if (stockDelta > 0) {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "UPDATE " + table("shop_stock")
+                                + " SET stock = stock + ?, sold = GREATEST(0, sold - ?) "
+                                + "WHERE shop_id = ? AND item_id = ?")) {
+                    ps.setInt(1, stockDelta);
+                    ps.setInt(2, quantity);
+                    ps.setString(3, shopId);
+                    ps.setString(4, itemId);
+                    ps.executeUpdate();
+                }
+            }
+            if (limit > 0) {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "UPDATE " + table("shop_limit") + " SET bought = GREATEST(0, bought - ?) "
+                                + "WHERE day = ? AND player_uuid = ? AND item_key = ?")) {
+                    ps.setInt(1, quantity);
+                    ps.setString(2, day);
+                    ps.setString(3, playerUuid);
+                    ps.setString(4, itemKey);
+                    ps.executeUpdate();
+                }
+            }
+            conn.commit();
+        } catch (Throwable t) {
+            rollbackQuietly(conn);
+            plugin.getLogger().warning("回滚跨服限购失败：" + t.getMessage());
+        } finally {
+            closeQuietly(conn);
+        }
+    }
+
+    /**
      * 回滚一次 {@link #reserveSell}（卖出时钱没能到账）。
      *
      * @param stockAdded 这次卖出实际增加的库存数（可能因为库存已满而为 0）

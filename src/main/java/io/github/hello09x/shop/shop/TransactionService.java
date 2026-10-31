@@ -141,14 +141,16 @@ public final class TransactionService {
             return;
         }
 
-        if (!currency.has(player, total) || !currency.withdraw(player, total)) {
-            callback.accept(new Outcome(Result.NOT_ENOUGH_MONEY, currency.balance(player), name(item)));
-            return;
-        }
-
+        // 本地 SQLite：立即扣款；跨服：先占库存，占成功后再扣款
         if (!shared) {
+            if (total > 0 && (!currency.has(player, total) || !currency.withdraw(player, total))) {
+                callback.accept(new Outcome(Result.NOT_ENOUGH_MONEY, currency.balance(player), name(item)));
+                return;
+            }
             if (!item.takeStock(quantity)) {
-                currency.deposit(player, total);
+                if (total > 0) {
+                    currency.deposit(player, total);
+                }
                 callback.accept(new Outcome(Result.OUT_OF_STOCK, 0, name(item)));
                 return;
             }
@@ -168,10 +170,10 @@ public final class TransactionService {
 
         final int wanted = quantity;
         final double unitPrice = unit;
-        final double paid = total;
         var uuid = player.getUniqueId().toString();
         var day = java.time.LocalDate.now().toString();
         var limit = item.isLimited() ? item.limit() : 0;
+        var charged = new java.util.concurrent.atomic.AtomicReference<>(0D);
 
         plugin.tradeStarted();
         try {
@@ -182,24 +184,27 @@ public final class TransactionService {
                 runSync(player, () -> {
                     int granted = reserved.granted();
                     if (granted < 0) {
-                        currency.deposit(player, paid);
                         callback.accept(new Outcome(Result.ERROR, 0, name(item)));
                         return;
                     }
                     if (granted <= 0) {
-                        currency.deposit(player, paid);
                         Result result = item.isLimitedStock() && reserved.stock() <= 0
                                 ? Result.OUT_OF_STOCK : Result.LIMIT_REACHED;
-                        callback.accept(new Outcome(result, paid, name(item)));
+                        callback.accept(new Outcome(result, 0, name(item)));
                         return;
                     }
 
-                    double finalTotal = paid;
-                    if (granted < wanted) {
-                        // 别的服先把库存/限购买走了，退还多扣的钱（按差额退，避免四舍五入误差）
-                        finalTotal = round(unitPrice * granted);
-                        currency.deposit(player, paid - finalTotal);
+                    double finalTotal = round(unitPrice * granted);
+                    if (finalTotal > 0
+                            && (!currency.has(player, finalTotal) || !currency.withdraw(player, finalTotal))) {
+                        // 扣款失败：把刚占的库存 / 限购买回滚
+                        db.releaseBuy(item.shopId(), item.itemId(), uuid, day, item.key(),
+                                limit, granted, Math.max(0, reserved.stockBefore() - reserved.stock()));
+                        callback.accept(new Outcome(Result.NOT_ENOUGH_MONEY,
+                                currency.balance(player), name(item)));
+                        return;
                     }
+                    charged.set(finalTotal);
 
                     plugin.stocks().applyReservation(item, reserved.stock(), reserved.stockSold());
                     if (item.isLimitedStock() && reserved.stock() <= 0) {
@@ -217,7 +222,10 @@ public final class TransactionService {
             });
         } catch (Throwable t) {
             plugin.tradeFinished();
-            currency.deposit(player, paid);
+            double back = charged.getAndSet(0D);
+            if (back > 0) {
+                currency.deposit(player, back);
+            }
             callback.accept(new Outcome(Result.ERROR, 0, name(item)));
         }
     }

@@ -69,7 +69,7 @@ public final class FavoriteMenu implements InventoryHolder {
         }
         if (hits.isEmpty()) {
             inventory.setItem(22, button(Material.BOOK, "&7收藏夹是空的",
-                    "&7用 /shop fav add <分类> <商品> 添加"));
+                    "&7在商店里 Shift+右键 商品即可收藏"));
         }
         if (page > 1) inventory.setItem(45, button(Material.ARROW, "&e« 上一页"));
         inventory.setItem(49, button(Material.PAPER,

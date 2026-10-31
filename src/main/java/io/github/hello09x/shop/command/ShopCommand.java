@@ -179,8 +179,8 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
         out.add("    &f/shop money &8» &7查看自己在各货币下的余额");
         out.add("    &f/shop search &e<关键词> &8» &7搜索商品");
         out.add("    &f/shop recent &8» &7最近 10 笔购买");
-        out.add("    &f/shop fav &e[add|remove|list] [分类] [商品] &8» &7收藏商品");
-        out.add("    &f/shop cart &e[add|remove|list|clear|buy] &8» &7购物车");
+        out.add("    &f/shop fav &e[remove|list] [分类] [商品] &8» &7收藏商品（商店里 Shift+右键 添加）");
+        out.add("    &f/shop cart &e[remove|list|clear|buy] &8» &7购物车（商店里 F 键加入）");
         out.add("    &f/shop myreport &e[today|yesterday|week|month] &8» &7我的交易日报");
         out.add("    &f/shop help &8» &7显示这份帮助");
         out.add("");
@@ -344,7 +344,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
         if (sub.equals("list")) {
             var list = plugin.favorites().list(player.getUniqueId());
             if (list.isEmpty()) {
-                sender.sendMessage(Text.color("&7收藏夹是空的，用 &f/shop fav add <分类> <商品> &7添加"));
+                sender.sendMessage(Text.color("&7收藏夹是空的，在商店里 &fShift+右键 &7商品即可收藏"));
                 return true;
             }
             sender.sendMessage(Text.color("&8&m--------&r &6我的收藏 &8&m--------"));
@@ -359,8 +359,8 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             }
             return true;
         }
-        if (!sub.equals("add") && !sub.equals("remove") && !sub.equals("del")) {
-            sender.sendMessage(Text.color("&c用法：/shop fav <add|remove|list> [分类] [商品]"));
+        if (!sub.equals("remove") && !sub.equals("del")) {
+            sender.sendMessage(Text.color("&c用法：/shop fav <remove|list> [分类] [商品]"));
             return true;
         }
         if (args.length < 4) {
@@ -377,15 +377,9 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Text.color("&c找不到商品：" + args[3]));
             return true;
         }
-        if (sub.equals("add")) {
-            boolean added = plugin.favorites().add(player.getUniqueId(), item.key());
-            sender.sendMessage(Text.color(added ? "&a已加入收藏：" + item.displayName()
-                    : "&7已经在收藏夹里了"));
-        } else {
-            boolean removed = plugin.favorites().remove(player.getUniqueId(), item.key());
-            sender.sendMessage(Text.color(removed ? "&a已取消收藏：" + item.displayName()
-                    : "&7收藏夹里没有这个商品"));
-        }
+        boolean removed = plugin.favorites().remove(player.getUniqueId(), item.key());
+        sender.sendMessage(Text.color(removed ? "&a已取消收藏：" + item.displayName()
+                : "&7收藏夹里没有这个商品"));
         return true;
     }
 
@@ -435,42 +429,11 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         if (sub.equals("add")) {
-            if (args.length < 4) {
-                sender.sendMessage(Text.color("&c用法：/shop cart add <分类> <商品id> [数量]"));
-                return true;
-            }
-            Shop shop = plugin.shops().get(args[2]);
-            ShopItem item = shop == null ? null : shop.find(args[3]);
-            if (shop == null || item == null) {
-                sender.sendMessage(Text.color("&c找不到商品"));
-                return true;
-            }
-            if (!shop.isOpen()) {
-                plugin.messages().send(sender, "shop-closed");
-                return true;
-            }
-            if (shop.type() != Shop.Type.BUY) {
-                sender.sendMessage(Text.color("&c收购商店只能出售，不能加入购物车"));
-                return true;
-            }
-            int quantity = 1;
-            if (args.length > 4) {
-                try {
-                    quantity = Math.max(1, Integer.parseInt(args[4]));
-                } catch (NumberFormatException ignored) {
-                    // 默认 1
-                }
-            }
-            if (quantity > 100_000) {
-                sender.sendMessage(Text.color("&c单次最多 100000 个"));
-                return true;
-            }
-            plugin.cart().add(player.getUniqueId(), item.key(), quantity);
-            sender.sendMessage(Text.color("&a已加入购物车：" + item.displayName() + " × " + quantity));
+            sender.sendMessage(Text.color("&c请在商店里按 F 键加入购物车"));
             return true;
         }
         if (!sub.equals("buy")) {
-            sender.sendMessage(Text.color("&c用法：/shop cart <add|remove|list|clear|buy>"));
+            sender.sendMessage(Text.color("&c用法：/shop cart <remove|list|clear|buy>"));
             return true;
         }
         new io.github.hello09x.shop.shop.CartService(plugin).checkout(player);

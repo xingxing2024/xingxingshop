@@ -191,8 +191,8 @@ public final class ShopView implements InventoryHolder {
                 selling ? "&e左键 &7卖 1 个" : "&e左键 &7买 1 个",
                 selling ? "&e右键 &7卖 1 组 (64)" : "&e右键 &7买 1 组 (64)",
                 selling ? "&eShift+左键 &7选数量卖" : "&eShift+左键 &7选数量买",
-                "&eF 键 &7加入购物车",
-                "&eShift+右键 &7收藏 / 取消收藏"));
+                selling ? "&eShift+右键 &7收藏 / 取消收藏" : "&eF 键 &7加入购物车",
+                selling ? "" : "&eShift+右键 &7收藏 / 取消收藏"));
 
         inventory.setItem(CONTROL + 8, button(Material.BARRIER, "&c关闭", "&7点击关闭界面"));
     }
@@ -323,7 +323,9 @@ public final class ShopView implements InventoryHolder {
             lore.add(Text.color("&e右键 &7买 1 组 (64)"));
         }
         lore.add(Text.color("&eShift+左键 &7聊天框输入数量"));
-        lore.add(Text.color("&eF 键 &7加入购物车"));
+        if (!selling) {
+            lore.add(Text.color("&eF 键 &7加入购物车"));
+        }
         lore.add(Text.color("&eShift+右键 &7收藏 / 取消收藏"));
 
         meta.setLore(lore);
