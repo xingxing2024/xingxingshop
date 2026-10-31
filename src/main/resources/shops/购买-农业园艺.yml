@@ -1,0 +1,64 @@
+# @shop-template-version: 3
+# =====================================================================
+#           农业园艺     -- 购买菜单说明
+#
+#  种子、农作物、树苗、土壤 / 种田党必备
+# =====================================================================
+
+id: farming
+
+name: '农业园艺'
+
+icon: WHEAT
+
+type: BUY
+
+desc:
+  - '&7种子、农作物、树苗、土壤'
+  - '&7种田党必备'
+
+items:
+  # ================= 种子 =================
+  wheat_seeds: 0.65
+  beetroot_seeds: 0.65
+  melon_seeds: 0.65
+  pumpkin_seeds: 0.65
+  cocoa_beans: 2.6
+  # ================= 农作物 =================
+  carrot: 0.264
+  potato: 0.264
+  wheat: 0.315
+  beetroot: 0.78
+  sugar_cane: 0.91
+  bamboo: 0.65
+  dried_kelp: 1.04
+  sweet_berries: 1.17
+  glow_berries: 3.9
+  melon_slice: 1.04
+  pumpkin: 1.3
+  egg: 1.95
+  bone_meal: 3.9
+  # ================= 土壤 =================
+  dirt: 0.78
+  grass_block: 2.6
+  podzol: 2.6
+  mycelium: 2.6
+  rooted_dirt: 1.95
+  coarse_dirt: 1.04
+  moss_block: 1.95
+  composter: 10.4
+  # ================= 树苗与种植 =================
+  oak_sapling: 2.6
+  spruce_sapling: 2.6
+  birch_sapling: 2.6
+  jungle_sapling: 2.6
+  acacia_sapling: 2.6
+  dark_oak_sapling: 2.6
+  cherry_sapling: 3.9
+  pale_oak_sapling: 3.9
+  mangrove_propagule: 3.9
+  azalea: 3.9
+  flowering_azalea: 5.2
+  honeycomb: 7.8
+  honey_bottle: 15.6
+  shears: 58.5

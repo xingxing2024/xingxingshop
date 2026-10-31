@@ -1,0 +1,45 @@
+name: XingXingShop
+version: '${project.version}'
+main: io.github.hello09x.shop.ShopPlugin
+api-version: '1.20'
+authors: [ xingxing ]
+description: 'GUI 商店：购买 / 收购分离，支持 Vault、点券、库存、动态价格与每日限购'
+website: 'https://github.com/xingxing2024'
+
+softdepend:
+  - TrMenu
+  - NekoTraps
+  - PlayerInv
+  - SweetFlight
+  - Vault
+  - PlaceholderAPI
+  - PlayerPoints
+
+commands:
+  shop:
+    description: '打开商店'
+    usage: |
+      /shop            打开主菜单
+      /shop buy        购买菜单
+      /shop sell       收购菜单
+      /shop money      查看余额
+      /shop list       列出商店（管理）
+      /shop log        查看交易记录（管理）
+      /shop reload     重载配置（管理）
+      /shop add        上架手持物品（管理）
+      /shop remove     下架商品（管理）
+      /shop price      改价（管理）
+      /shop stock      改库存（管理）
+      /shop info       查看商品详情（管理）
+    aliases: [ shops, xshop ]
+
+permissions:
+  xshop.use:
+    description: '打开商店并购买'
+    default: true
+  xshop.sell:
+    description: '把物品卖给商店'
+    default: true
+  xshop.admin:
+    description: '管理商店（重载 / 上架 / 下架 / 改价 / 改库存）'
+    default: op

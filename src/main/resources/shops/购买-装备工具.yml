@@ -1,0 +1,57 @@
+# @shop-template-version: 3
+# =====================================================================
+#           装备工具     （购买菜单）
+#
+#  ───────────────────────────────────────────────────────────────
+#   定价说明
+#   装备属于「一次性投入」，价格比材料高但应该攒一攒就能买
+#   铁装 60 ~ 150，钻石装 600 ~ 900，下界合金 2000+
+#  ───────────────────────────────────────────────────────────────
+# =====================================================================
+
+id: gear
+
+name: '装备工具'
+
+icon: DIAMOND_SWORD
+
+type: BUY
+
+desc:
+  - '&7武器、防具与工具'
+  - '&7从铁装一路到钻石装'
+
+items:
+  # ================= 武器 =================
+  wooden_sword: 19.5
+  stone_sword: 52
+  iron_sword: 156
+  diamond_sword:
+    buy: 1170
+    stock: 50
+    dynamic: true
+  bow: 104
+  crossbow: 182
+  shield: 234
+  trident:
+    buy: 1560
+    limit: 1
+  # ================= 防具 =================
+  iron_helmet: 117
+  iron_chestplate: 182
+  iron_leggings: 156
+  iron_boots: 104
+  diamond_helmet: 910
+  diamond_chestplate: 1300
+  diamond_leggings: 1170
+  diamond_boots: 845
+  # ================= 工具 =================
+  iron_pickaxe: 143
+  diamond_pickaxe:
+    buy: 1105
+    limit: 2
+  iron_axe: 143
+  diamond_axe: 1105
+  iron_shovel: 78
+  diamond_shovel: 650
+  fishing_rod: 52

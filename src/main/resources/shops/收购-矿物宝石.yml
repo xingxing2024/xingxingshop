@@ -1,0 +1,43 @@
+# @shop-template-version: 3
+# =====================================================================
+#           矿物宝石     -- 收购菜单说明
+#
+#  矿石、原矿、锭、宝石 / 挖矿党稳定的收入来源
+# =====================================================================
+
+id: sell-ores
+
+name: '矿物宝石'
+
+icon: RAW_IRON
+
+type: SELL
+
+desc:
+  - '&7矿石、原矿、锭、宝石'
+  - '&7挖矿党稳定的收入来源'
+
+items:
+  # ================= 原矿 =================
+  raw_copper: 0.4
+  raw_iron: 0.8
+  raw_gold: 1.2
+  coal: 0.15
+  charcoal: 0.12
+  redstone: 2
+  lapis_lazuli: 2.5
+  quartz: 0.5
+  amethyst_shard: 3
+  flint: 0.2
+  # ================= 金属锭 =================
+  copper_ingot: 0.6
+  iron_ingot: 1
+  gold_ingot: 1.5
+  netherite_scrap: 60
+  netherite_ingot: 240
+  # ================= 宝石 =================
+  diamond: 25
+  emerald: 30
+  prismarine_shard: 2
+  nether_star: 400
+  heart_of_the_sea: 300

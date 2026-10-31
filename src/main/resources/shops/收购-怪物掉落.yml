@@ -1,0 +1,41 @@
+# @shop-template-version: 3
+# =====================================================================
+#           怪物掉落     -- 收购菜单说明
+#
+#  骨头、羽毛、火药、蛛丝等 / 打怪掉的东西也能卖钱
+# =====================================================================
+
+id: sell-drops
+
+name: '怪物掉落'
+
+icon: BONE
+
+type: SELL
+
+desc:
+  - '&7骨头、羽毛、火药、蛛丝等'
+  - '&7打怪掉的东西也能卖钱'
+
+items:
+  # ================= 常见掉落 =================
+  rotten_flesh: 0.03
+  bone: 0.15
+  string: 0.15
+  feather: 0.1
+  leather: 0.35
+  spider_eye: 0.3
+  gunpowder: 0.8
+  slime_ball: 1.2
+  magma_cream: 1.5
+  prismarine_crystals: 1
+  ink_sac: 0.2
+  # ================= 稀有掉落 =================
+  ender_pearl: 5
+  blaze_rod: 4
+  ghast_tear: 6
+  phantom_membrane: 8
+  dragon_breath: 10
+  shulker_shell: 50
+  totem_of_undying: 800
+  # ================= 装备残骸 =================

@@ -1,0 +1,50 @@
+# @shop-template-version: 3
+# =====================================================================
+#           杂物工具     -- 购买菜单说明
+#
+#  桶、马铠、书、望远镜、杂项 / 想到想不到的日常杂物
+# =====================================================================
+
+id: misc
+
+name: '杂物工具'
+
+icon: BUCKET
+
+type: BUY
+
+desc:
+  - '&7桶、马铠、书、望远镜、杂项'
+  - '&7想到想不到的日常杂物'
+
+items:
+  # ================= 桶类 =================
+  bucket: 84.5
+  water_bucket: 130
+  lava_bucket: 156
+  milk_bucket: 143
+  powder_snow_bucket: 130
+  # ================= 坐骑与工具 =================
+  saddle: 195
+  lead: 13
+  name_tag: 156
+  iron_horse_armor: 156
+  golden_horse_armor: 117
+  diamond_horse_armor: 260
+  wolf_armor: 195
+  flint_and_steel: 45.5
+  brush: 39
+  spyglass: 65
+  compass: 39
+  recovery_compass: 260
+  clock: 52
+  # ================= 书写与杂项 =================
+  book: 6.5
+  writable_book: 10.4
+  paper: 0.65
+  map: 19.5
+  arrow: 0.39
+  spectral_arrow: 3.9
+  snowball: 1.3
+  firework_star: 10.4
+  firework_rocket: 15.6

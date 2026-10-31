@@ -1,0 +1,35 @@
+# @shop-template-version: 3
+# =====================================================================
+#           酿造加工     -- 购买菜单说明
+#
+#  药水材料与酿造设备 / 各种炼药原料都有
+# =====================================================================
+
+id: brewing
+
+name: '酿造加工'
+
+icon: BREWING_STAND
+
+type: BUY
+
+desc:
+  - '&7药水材料与酿造设备'
+  - '&7各种炼药原料都有'
+
+items:
+  # ================= 酿造设备 =================
+  brewing_stand: 39
+  cauldron: 13
+  glass_bottle: 2.6
+  fermented_spider_eye: 23.4
+  spider_eye: 6.5
+  glistering_melon_slice: 19.5
+  rabbit_foot: 23.4
+  dragon_breath: 58.5
+  gunpowder: 10.4
+  sugar: 2.6
+  glowstone_dust: 9.1
+  phantom_membrane: 91
+  echo_shard: 156
+  experience_bottle: 16.9

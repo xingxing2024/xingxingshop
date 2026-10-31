@@ -1,0 +1,54 @@
+# @shop-template-version: 3
+# =====================================================================
+#           农产品收购     -- 收购菜单说明
+#
+#  农作物、种子、树苗、鱼类 / 种田钓鱼都能换钱
+# =====================================================================
+
+id: sell-crops
+
+name: '农产品收购'
+
+icon: WHEAT
+
+type: SELL
+
+desc:
+  - '&7农作物、种子、树苗、鱼类'
+  - '&7种田钓鱼都能换钱'
+
+items:
+  # ================= 农作物 =================
+  wheat: 0.1
+  carrot: 0.08
+  potato: 0.08
+  beetroot: 0.1
+  sugar_cane: 0.12
+  melon_slice: 0.12
+  pumpkin: 0.15
+  sweet_berries: 0.12
+  glow_berries: 0.4
+  cocoa_beans: 0.3
+  bamboo: 0.05
+  kelp: 0.04
+  dried_kelp: 0.06
+  egg: 0.15
+  honeycomb: 0.6
+  # ================= 种子与树苗 =================
+  wheat_seeds: 0.02
+  beetroot_seeds: 0.02
+  melon_seeds: 0.02
+  pumpkin_seeds: 0.02
+  oak_sapling: 0.2
+  spruce_sapling: 0.2
+  birch_sapling: 0.2
+  jungle_sapling: 0.2
+  acacia_sapling: 0.2
+  dark_oak_sapling: 0.2
+  mangrove_propagule: 0.3
+  cherry_sapling: 0.4
+  # ================= 鱼类 =================
+  cod: 0.5
+  salmon: 0.6
+  tropical_fish: 1.5
+  pufferfish: 3

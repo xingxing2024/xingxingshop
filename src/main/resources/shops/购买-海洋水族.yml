@@ -1,0 +1,60 @@
+# @shop-template-version: 3
+# =====================================================================
+#           海洋水族     -- 购买菜单说明
+#
+#  海晶、珊瑚、海绵、海洋生物 / 海洋主题一应俱全
+# =====================================================================
+
+id: ocean
+
+name: '海洋水族'
+
+icon: NAUTILUS_SHELL
+
+type: BUY
+
+desc:
+  - '&7海晶、珊瑚、海绵、海洋生物'
+  - '&7海洋主题一应俱全'
+
+items:
+  # ================= 海晶与照明 =================
+  prismarine_shard: 10.4
+  prismarine_crystals: 7.8
+  sea_lantern: 13
+  prismarine: 6.5
+  prismarine_bricks: 7.8
+  dark_prismarine: 7.15
+  conduit: 455
+  sponge: 13
+  wet_sponge: 15.6
+  # ================= 珊瑚 =================
+  tube_coral_block: 15.6
+  brain_coral_block: 15.6
+  bubble_coral_block: 15.6
+  fire_coral_block: 15.6
+  horn_coral_block: 15.6
+  tube_coral: 10.4
+  brain_coral: 10.4
+  bubble_coral: 10.4
+  fire_coral: 10.4
+  horn_coral: 10.4
+  tube_coral_fan: 7.8
+  brain_coral_fan: 7.8
+  bubble_coral_fan: 7.8
+  fire_coral_fan: 7.8
+  horn_coral_fan: 7.8
+  sea_pickle: 5.2
+  kelp: 0.65
+  dried_kelp_block: 3.25
+  lily_pad: 2.6
+  # ================= 海洋生物与材料 =================
+  turtle_egg: 15.6
+  turtle_scute: 23.4
+  turtle_helmet: 156
+  nautilus_shell: 117
+  heart_of_the_sea: 1950
+  cod: 3.9
+  salmon: 3.9
+  tropical_fish: 7.8
+  pufferfish: 15.6

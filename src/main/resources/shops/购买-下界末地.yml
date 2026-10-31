@@ -1,0 +1,66 @@
+# @shop-template-version: 3
+# =====================================================================
+#           下界末地     -- 购买菜单说明
+#
+#  下界与末地材料、生物头颅 / 稀有材料都在这里
+# =====================================================================
+
+id: nether
+
+name: '下界末地'
+
+icon: CRYING_OBSIDIAN
+
+type: BUY
+
+desc:
+  - '&7下界与末地材料、生物头颅'
+  - '&7稀有材料都在这里'
+
+items:
+  # ================= 下界方块 =================
+  netherrack: 0.65
+  nether_wart_block: 7.8
+  warped_wart_block: 7.8
+  crimson_stem: 2.6
+  warped_stem: 2.6
+  crimson_nylium: 3.25
+  warped_nylium: 3.25
+  shroomlight: 9.1
+  soul_sand: 2.6
+  soul_soil: 2.6
+  magma_block: 3.9
+  glowstone: 10.4
+  basalt: 1.95
+  polished_basalt: 2.6
+  smooth_basalt: 2.6
+  blackstone: 2.6
+  gilded_blackstone: 6.5
+  obsidian: 10.4
+  crying_obsidian: 15.6
+  # ================= 下界材料 =================
+  nether_wart: 10.4
+  blaze_rod: 20.8
+  blaze_powder: 26
+  ghast_tear: 39
+  magma_cream: 26
+  ancient_debris:
+    buy: 1170
+    limit: 1
+  netherite_scrap:
+    buy: 1170
+    limit: 1
+  netherite_ingot:
+    buy: 1560
+    limit: 1
+  # ================= 末地材料 =================
+  end_stone: 3.9
+  end_stone_bricks: 5.2
+  purpur_block: 6.5
+  purpur_pillar: 6.5
+  chorus_fruit: 5.2
+  popped_chorus_fruit: 6.5
+  chorus_flower: 15.6
+  ender_pearl: 13
+  ender_eye: 39
+  shulker_shell: 585

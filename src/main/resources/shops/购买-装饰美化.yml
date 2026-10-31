@@ -1,0 +1,78 @@
+# @shop-template-version: 3
+# =====================================================================
+#           装饰美化     -- 购买菜单说明
+#
+#  花草、旗帜、相框、摆件 / 让你的建筑更好看
+# =====================================================================
+
+id: decoration
+
+name: '装饰美化'
+
+icon: PEONY
+
+type: BUY
+
+desc:
+  - '&7花草、旗帜、相框、摆件'
+  - '&7让你的建筑更好看'
+
+items:
+  # ================= 花草植物 =================
+  dandelion: 2.6
+  poppy: 2.6
+  blue_orchid: 2.6
+  allium: 2.6
+  azure_bluet: 2.6
+  red_tulip: 2.6
+  orange_tulip: 2.6
+  white_tulip: 2.6
+  pink_tulip: 2.6
+  oxeye_daisy: 2.6
+  cornflower: 2.6
+  lily_of_the_valley: 2.6
+  sunflower: 2.6
+  lilac: 2.6
+  rose_bush: 2.6
+  peony: 2.6
+  tall_grass: 2.6
+  large_fern: 2.6
+  fern: 2.6
+  dead_bush: 2.6
+  cactus: 2.6
+  # ================= 摆件装饰 =================
+  flower_pot: 2.6
+  painting: 6.5
+  item_frame: 5.2
+  glow_item_frame: 7.8
+  armor_stand: 9.1
+  decorated_pot: 6.5
+  vine: 1.95
+  cobweb: 2.6
+  ladder: 1.95
+  scaffolding: 3.25
+  torchflower: 7.8
+  pitcher_plant: 11.7
+  spore_blossom: 18.2
+  big_dripleaf: 9.1
+  small_dripleaf: 6.5
+  glow_lichen: 3.9
+  hanging_roots: 3.9
+  moss_carpet: 1.3
+  # ================= 十六色旗帜 =================
+  white_banner: 3.9
+  light_gray_banner: 3.9
+  gray_banner: 3.9
+  black_banner: 3.9
+  brown_banner: 3.9
+  red_banner: 3.9
+  orange_banner: 3.9
+  yellow_banner: 3.9
+  lime_banner: 3.9
+  green_banner: 3.9
+  cyan_banner: 3.9
+  light_blue_banner: 3.9
+  blue_banner: 3.9
+  purple_banner: 3.9
+  magenta_banner: 3.9
+  pink_banner: 3.9
