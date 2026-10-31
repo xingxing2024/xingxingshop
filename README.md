@@ -1,12 +1,12 @@
 # XingXingShop
 
-> 面向 **Paper / Purpur 26.x** 的 GUI 商店插件：购买 / 收购分离、MySQL 跨服、库存限购、动态价格、自定义物品、折扣 VIP、交易日报。
+> 面向 **Paper / Purpur 1.20.6 ~ 26.x** 的 GUI 商店插件：购买 / 收购分离、MySQL 跨服、库存限购、动态价格、自定义物品、折扣 VIP、交易日报。
 
 [![Build](https://github.com/xingxing2024/xingxingshop/actions/workflows/build.yml/badge.svg)](https://github.com/xingxing2024/xingxingshop/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/xingxing2024/xingxingshop)](https://github.com/xingxing2024/xingxingshop/releases)
 [![License](https://img.shields.io/github/license/xingxing2024/xingxingshop)](LICENSE)
-[![Java](https://img.shields.io/badge/Java-25%2B-orange)](https://adoptium.net/)
-[![Paper](https://img.shields.io/badge/Paper-26.x-blueviolet)](https://papermc.io/)
+[![Java](https://img.shields.io/badge/Java-21%2B-orange)](https://adoptium.net/)
+[![Paper](https://img.shields.io/badge/Paper-1.20.6%20~%2026.x-blueviolet)](https://papermc.io/)
 [![bStats](https://img.shields.io/badge/bStats-35029-2f9e44)](https://bstats.org/plugin/bukkit/xingxingshop/35029)
 
 **[完整文档（Wiki）](https://github.com/xingxing2024/xingxingshop/wiki)** · **[下载最新版](https://github.com/xingxing2024/xingxingshop/releases)** · **[问题反馈](https://github.com/xingxing2024/xingxingshop/issues)**
@@ -71,10 +71,10 @@
 
 ## 安装
 
-1. 服务端：**Paper / Purpur 26.x**
-2. Java：**25+**
+1. 服务端：**Paper / Purpur 1.20.6 ~ 26.x**
+2. Java：**21+**
 3. 安装 **Vault** + 任意经济插件（EssentialsX / CMI / XConomy 等）
-4. 把 `XingXingShop-1.0.5.jar` 放进 `plugins/`
+4. 把 `XingXingShop-1.0.6.jar` 放进 `plugins/`
 5. 启动服务器
 
 首次启动会自动释放：
@@ -210,10 +210,20 @@ database:
 
 | 项目 | 要求 |
 |---|---|
-| 服务端 | Paper / Purpur 26.x（26.3 实测通过） |
-| Java | **25+** |
+| 服务端 | Paper / Purpur 1.20.6 ~ 26.x（26.3 实测通过） |
+| Java | **21+** |
 | 必需 | Vault + 任意经济插件 |
 | 可选 | PlayerPoints、PlaceholderAPI、ItemsAdder、Nexo、MMOItems |
+
+### 版本支持
+
+| 版本 | 状态 |
+|---|---|
+| Paper / Purpur 1.20.6 ~ 26.x | ✅ 编译基线 |
+| Paper / Purpur 26.3 | ✅ 实测 |
+| Folia 1.20.6+ | ⚠️ 已做调度兼容，未实机验证 |
+| 1.20.5 及更老 | ❌ 不支持 |
+| Spigot / CraftBukkit | ❌ 不支持 |
 
 ---
 
@@ -260,7 +270,7 @@ metrics:
 
 ## 构建
 
-需要 JDK 25：
+需要 JDK 21：
 
 ```bash
 mvn clean package
@@ -269,7 +279,7 @@ mvn clean package
 产物：
 
 ```text
-target/XingXingShop-1.0.5.jar
+target/XingXingShop-1.0.6.jar
 ```
 
 ---
