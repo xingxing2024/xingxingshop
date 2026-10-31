@@ -179,7 +179,7 @@ public final class ShopView implements InventoryHolder {
                 selling ? "&e左键 &7卖 1 个" : "&e左键 &7买 1 个",
                 selling ? "&e右键 &7卖 1 组 (64)" : "&e右键 &7买 1 组 (64)",
                 selling ? "&eShift+左键 &7选数量卖" : "&eShift+左键 &7选数量买",
-                "&dF 键 / Shift+右键 &7收藏 / 取消收藏"));
+                "&eF 键 / Shift+右键 &7收藏 / 取消收藏"));
 
         inventory.setItem(CONTROL + 8, button(Material.BARRIER, "&c关闭", "&7点击关闭界面"));
     }
@@ -232,7 +232,7 @@ public final class ShopView implements InventoryHolder {
             lore.add(Text.color("&6VIP 专享价"));
         }
         lore.add(Text.color(plugin.favorites().contains(viewer.getUniqueId(), item.key())
-                ? "&d❤ 已收藏"
+                ? "&b❤ 已收藏"
                 : "&8❤ 未收藏"));
         lore.add(Text.color(GuiStyle.SEP));
 
@@ -307,7 +307,7 @@ public final class ShopView implements InventoryHolder {
             lore.add(Text.color("&e右键 &7买 1 组 (64)"));
         }
         lore.add(Text.color("&eShift+左键 &7聊天框输入数量"));
-        lore.add(Text.color("&dF 键 / Shift+右键 &7收藏 / 取消收藏"));
+        lore.add(Text.color("&eF 键 / Shift+右键 &7收藏 / 取消收藏"));
 
         meta.setLore(lore);
         stack.setItemMeta(meta);
@@ -478,7 +478,7 @@ public final class ShopView implements InventoryHolder {
         }
         io.github.hello09x.shop.util.Sounds.play(viewer, "click");
         viewer.sendMessage(Text.color(now
-                ? "&d❤ 已收藏 &f" + item.displayName()
+                ? "&b❤ 已收藏 &f" + item.displayName()
                 : "&7已取消收藏 &f" + item.displayName()));
         render();
     }

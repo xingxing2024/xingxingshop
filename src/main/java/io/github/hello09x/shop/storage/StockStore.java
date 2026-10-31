@@ -12,8 +12,12 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
+import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -29,6 +33,9 @@ public final class StockStore {
     private final File file;
     /** 单服模式下每个商品的下一次补货时间 */
     private final Map<String, Long> localNextRestock = new ConcurrentHashMap<>();
+
+    /** 每日限额刷新的提醒记录：玩家 -> 已提醒的日期 */
+    private final Map<UUID, LocalDate> limitNoticeDay = new ConcurrentHashMap<>();
 
     public StockStore(@NotNull ShopPlugin plugin) {
         this.plugin = plugin;
@@ -145,6 +152,48 @@ public final class StockStore {
             Schedulers.entity(plugin, player, () -> player.sendMessage(Text.color(
                     "&c[商店] &f" + item.displayName() + " &c已售罄")));
         }
+    }
+
+    /**
+     * 新的一天：提醒收藏里有限购 / 限卖的商品额度已刷新。
+     * 每天每人只提醒一次，跨天上线也会补发。
+     */
+    public void notifyDailyLimitRefresh(@NotNull Player player) {
+        var uuid = player.getUniqueId();
+        LocalDate today = LocalDate.now();
+        if (today.equals(limitNoticeDay.get(uuid))) {
+            return;
+        }
+        limitNoticeDay.put(uuid, today);
+
+        Schedulers.entity(plugin, player, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            List<String> names = new ArrayList<>();
+            for (String key : plugin.favorites().list(uuid)) {
+                int split = key.indexOf(':');
+                if (split <= 0) {
+                    continue;
+                }
+                Shop shop = plugin.shops().get(key.substring(0, split));
+                ShopItem item = shop == null ? null : shop.find(key.substring(split + 1));
+                if (item == null || !shop.isOpen()) {
+                    continue;
+                }
+                if (item.isLimited() || item.isSellLimited()) {
+                    names.add(item.displayName());
+                }
+                if (names.size() >= 5) {
+                    break;
+                }
+            }
+            if (names.isEmpty()) {
+                return;
+            }
+            player.sendMessage(Text.color("&a[商店] &7新的一天，收藏的 &f"
+                    + String.join("、", names) + " &7限购 / 限卖额度已刷新"));
+        });
     }
 
     private void applyRows(@NotNull java.util.List<TransactionDatabase.StockRow> rows) {        Map<String, ShopItem> byKey = buildIndex();

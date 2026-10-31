@@ -185,6 +185,9 @@ public final class ShopPlugin extends JavaPlugin {
         Schedulers.asyncTimer(this, () -> {
             try {
                 stocks.restockAll();
+                for (var player : Bukkit.getOnlinePlayers()) {
+                    stocks.notifyDailyLimitRefresh(player);
+                }
             } catch (Throwable t) {
                 getLogger().warning("自动补货失败：" + t.getMessage());
             }

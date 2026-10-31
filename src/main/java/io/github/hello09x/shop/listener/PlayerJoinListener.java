@@ -32,6 +32,11 @@ public final class PlayerJoinListener implements Listener {
             } catch (Throwable t) {
                 plugin.getLogger().warning("补发个人日报失败：" + t.getMessage());
             }
+            try {
+                plugin.stocks().notifyDailyLimitRefresh(player);
+            } catch (Throwable t) {
+                plugin.getLogger().warning("提醒限购刷新失败：" + t.getMessage());
+            }
         }, 40L);
     }
 

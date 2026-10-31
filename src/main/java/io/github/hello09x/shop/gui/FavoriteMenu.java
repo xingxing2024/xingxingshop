@@ -51,9 +51,9 @@ public final class FavoriteMenu implements InventoryHolder {
     public void render() {
         inventory.clear();
         GuiStyle.fill(inventory, ITEM_START, ITEM_START + PAGE_SIZE);
-        GuiStyle.frame(inventory, Material.PINK_STAINED_GLASS_PANE);
+        GuiStyle.frame(inventory, Material.CYAN_STAINED_GLASS_PANE);
         inventory.setItem(4, button(Material.HEART_OF_THE_SEA,
-                "&d&l我的收藏",
+                "&b&l我的收藏",
                 "&8" + "▬".repeat(10),
                 "&7已收藏 &f" + hits.size() + " &7件"));
         int pages = Math.max(1, (hits.size() + PAGE_SIZE - 1) / PAGE_SIZE);
@@ -81,7 +81,7 @@ public final class FavoriteMenu implements InventoryHolder {
         if (page > 1) inventory.setItem(45, button(Material.ARROW, "&e« 上一页"));
         inventory.setItem(49, button(Material.PAPER,
                 "&f第 &a" + page + " &f/ &a" + pages + " &f页",
-                "&d" + GuiStyle.pageBar(page, pages) + " &7翻页",
+                "&b" + GuiStyle.pageBar(page, pages) + " &7翻页",
                 "&7共 &f" + hits.size() + " &7个收藏"));
         if (page < pages) inventory.setItem(53, button(Material.ARROW, "&e下一页 »"));
         inventory.setItem(48, button(Material.BARRIER, "&c关闭"));

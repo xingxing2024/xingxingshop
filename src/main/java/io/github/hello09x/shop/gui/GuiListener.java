@@ -12,6 +12,10 @@ import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.InventoryHolder;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
 /**
  * 拦截商店 GUI 的所有点击 / 拖拽。
  *
@@ -21,7 +25,11 @@ import org.jetbrains.annotations.NotNull;
  */
 public final class GuiListener implements Listener {
 
+    /** 同一玩家两次有效点击的最小间隔，防连点 */
+    private static final long CLICK_COOLDOWN_MS = 250;
+
     private final ShopPlugin plugin;
+    private final Map<UUID, Long> lastClick = new ConcurrentHashMap<>();
 
     public GuiListener(@NotNull ShopPlugin plugin) {
         this.plugin = plugin;
@@ -48,6 +56,15 @@ public final class GuiListener implements Listener {
 
         if (!(event.getWhoClicked() instanceof Player)) {
             return;
+        }
+
+        long now = System.currentTimeMillis();
+        Long last = lastClick.put(event.getWhoClicked().getUniqueId(), now);
+        if (last != null && now - last < CLICK_COOLDOWN_MS) {
+            return;
+        }
+        if (lastClick.size() > 200) {
+            lastClick.entrySet().removeIf(e -> now - e.getValue() > 10_000L);
         }
 
         int raw = event.getRawSlot();

@@ -84,13 +84,13 @@ public final class MainMenu implements InventoryHolder {
         // 收藏夹
         int favorites = plugin.favorites().list(viewer.getUniqueId()).size();
         inventory.setItem(FAVORITE_SLOT, icon(Material.HEART_OF_THE_SEA,
-                "&d&l❤ 我的收藏",
+                "&b&l❤ 我的收藏",
                 "&8" + "▬".repeat(10),
                 favorites == 0 ? "&7还没有收藏任何商品" : "&7已收藏 &f" + favorites + " &7件",
                 "",
                 favorites == 0
                         ? "&8在商店里用 /shop fav add 添加"
-                        : "&d➤ 点击查看"));
+                        : "&b➤ 点击查看"));
 
         // 余额
         var currency = plugin.currencies().getOrDefault(null);
