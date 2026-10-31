@@ -597,7 +597,7 @@ public final class TransactionDatabase {
     // ================================================================
 
     /** 一次原子预留的结果；{@code granted < 0} 表示数据库出错 */
-    public record Reservation(int granted, int stock, int stockSold, int limitValue) {
+    public record Reservation(int granted, int stock, int stockSold, int limitValue, int stockBefore) {
     }
 
     /**
@@ -637,6 +637,10 @@ public final class TransactionDatabase {
                     stock = rs.getInt(1);
                     stockSold = rs.getInt(2);
                 }
+            }
+            int stockBefore = stock;
+            if (maxStock > 0) {
+                stock = Math.min(stock, maxStock);
             }
 
             int bought = 0;
@@ -689,11 +693,11 @@ public final class TransactionDatabase {
             }
 
             conn.commit();
-            return new Reservation(qty, stock, stockSold, bought);
+            return new Reservation(qty, stock, stockSold, bought, stockBefore);
         } catch (Throwable t) {
             rollbackQuietly(conn);
             plugin.getLogger().warning("跨服扣库存失败：" + t.getMessage());
-            return new Reservation(-1, 0, 0, 0);
+            return new Reservation(-1, 0, 0, 0, 0);
         } finally {
             closeQuietly(conn);
         }
@@ -729,6 +733,10 @@ public final class TransactionDatabase {
                     stock = rs.getInt(1);
                     stockSold = rs.getInt(2);
                 }
+            }
+            int stockBefore = stock;
+            if (maxStock > 0) {
+                stock = Math.min(stock, maxStock);
             }
 
             int sold = 0;
@@ -779,11 +787,63 @@ public final class TransactionDatabase {
             }
 
             conn.commit();
-            return new Reservation(qty, stock, stockSold, sold);
+            return new Reservation(qty, stock, stockSold, sold, stockBefore);
         } catch (Throwable t) {
             rollbackQuietly(conn);
             plugin.getLogger().warning("跨服加库存失败：" + t.getMessage());
-            return new Reservation(-1, 0, 0, 0);
+            return new Reservation(-1, 0, 0, 0, 0);
+        } finally {
+            closeQuietly(conn);
+        }
+    }
+
+    /**
+     * 回滚一次 {@link #reserveSell}（卖出时钱没能到账）。
+     *
+     * @param stockAdded 这次卖出实际增加的库存数（可能因为库存已满而为 0）
+     */
+    public void releaseSell(
+            @NotNull String shopId,
+            @NotNull String itemId,
+            @NotNull String playerUuid,
+            @NotNull String day,
+            @NotNull String itemKey,
+            int sellLimit,
+            int quantity,
+            int stockAdded
+    ) {
+        if (quantity <= 0) {
+            return;
+        }
+        Connection conn = null;
+        try {
+            conn = connection();
+            conn.setAutoCommit(false);
+            if (stockAdded > 0) {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "UPDATE shop_stock SET stock = GREATEST(0, stock - ?) "
+                                + "WHERE shop_id = ? AND item_id = ?")) {
+                    ps.setInt(1, stockAdded);
+                    ps.setString(2, shopId);
+                    ps.setString(3, itemId);
+                    ps.executeUpdate();
+                }
+            }
+            if (sellLimit > 0) {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "UPDATE shop_limit SET sold = GREATEST(0, sold - ?) "
+                                + "WHERE day = ? AND player_uuid = ? AND item_key = ?")) {
+                    ps.setInt(1, quantity);
+                    ps.setString(2, day);
+                    ps.setString(3, playerUuid);
+                    ps.setString(4, itemKey);
+                    ps.executeUpdate();
+                }
+            }
+            conn.commit();
+        } catch (Throwable t) {
+            rollbackQuietly(conn);
+            plugin.getLogger().warning("回滚跨服限卖失败：" + t.getMessage());
         } finally {
             closeQuietly(conn);
         }

@@ -1,6 +1,7 @@
 package io.github.hello09x.shop.shop;
 
 import io.github.hello09x.shop.ShopPlugin;
+import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -43,7 +44,7 @@ public final class CustomItems {
             return null;
         }
         try {
-            return switch (provider) {
+            ItemStack result = switch (provider) {
                 case "itemsadder", "ia" -> itemsAdder(id);
                 case "nexo" -> nexo(id);
                 case "mmoitems", "mmo" -> mmoItems(id);
@@ -52,6 +53,10 @@ public final class CustomItems {
                     yield null;
                 }
             };
+            if (result == null || result.getType() == Material.AIR) {
+                return null;
+            }
+            return result;
         } catch (ClassNotFoundException e) {
             warn(provider, "没有安装对应的自定义物品插件");
             return null;

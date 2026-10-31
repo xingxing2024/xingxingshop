@@ -77,8 +77,12 @@ public final class StockStore {
      * 把数据库返回的最新库存 / 销量同步到内存商品。
      */
     public void applyReservation(@NotNull ShopItem item, int stock, int sold) {
-        item.stock(stock);
-        item.sold(sold);
+        int safeStock = Math.max(0, stock);
+        if (item.maxStock() > 0) {
+            safeStock = Math.min(item.maxStock(), safeStock);
+        }
+        item.stock(safeStock);
+        item.sold(Math.max(0, sold));
     }
 
     private void migrateFromFile() {
@@ -98,10 +102,14 @@ public final class StockStore {
         Map<String, ShopItem> byKey = buildIndex();
         for (ShopItem item : byKey.values()) {
             if (yaml.contains(item.key() + ".stock")) {
-                item.stock(yaml.getInt(item.key() + ".stock"));
+                int value = yaml.getInt(item.key() + ".stock");
+                if (item.maxStock() > 0) {
+                    value = Math.min(item.maxStock(), value);
+                }
+                item.stock(Math.max(0, value));
             }
             if (yaml.contains(item.key() + ".sold")) {
-                item.sold(yaml.getInt(item.key() + ".sold"));
+                item.sold(Math.max(0, yaml.getInt(item.key() + ".sold")));
             }
         }
     }

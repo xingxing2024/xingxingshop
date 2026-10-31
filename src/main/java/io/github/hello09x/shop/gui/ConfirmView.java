@@ -17,6 +17,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 交易确认界面。
@@ -45,6 +46,9 @@ public final class ConfirmView implements InventoryHolder {
     private final boolean selling;
 
     private final Inventory inventory;
+
+    /** 防止同一张确认界面被重复触发 */
+    private final AtomicBoolean handled = new AtomicBoolean();
 
     public ConfirmView(@NotNull ShopPlugin plugin, @NotNull Shop shop, @NotNull ShopItem item,
                        @NotNull Player viewer, int quantity, boolean selling) {
@@ -189,6 +193,9 @@ public final class ConfirmView implements InventoryHolder {
 
     public void onClick(int slot) {
         if (slot == CONFIRM_SLOT) {
+            if (!handled.compareAndSet(false, true)) {
+                return;
+            }
             // 不再单独播「确认」音效：紧接着的成交音效就是反馈，避免两个音效同一刻叠在一起
             // 回到商店界面并执行
             plugin.gui().open(viewer, shop);
@@ -200,6 +207,9 @@ public final class ConfirmView implements InventoryHolder {
             return;
         }
         if (slot == CANCEL_SLOT) {
+            if (!handled.compareAndSet(false, true)) {
+                return;
+            }
             io.github.hello09x.shop.util.Sounds.play(viewer, "cancel");
             plugin.gui().open(viewer, shop);
         }

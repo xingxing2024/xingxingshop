@@ -29,7 +29,7 @@ public final class ShopItem {
     /** 单个买入价 */
     private final double buyPrice;
     /** 单个卖出价；{@code null} 表示按全局 sell-ratio 计算 */
-    private final Double sellPrice;
+    private Double sellPrice;
     private final String currencyId;
 
     private final int slot;
@@ -101,6 +101,25 @@ public final class ShopItem {
         return buyPrice;
     }
 
+    /** 基础卖出单价（未计算动态波动和库存倍率） */
+    public double baseSellPrice() {
+        return sellPrice != null
+                ? sellPrice
+                : buyPrice * ShopPlugin.getInstance().config().sellRatio();
+    }
+
+    /**
+     * 防止「低买高卖」：把收购价压到不高于最低买入价。
+     */
+    void capSellPrice(double max) {
+        if (!Double.isFinite(max) || max < 0) {
+            return;
+        }
+        if (baseSellPrice() > max) {
+            this.sellPrice = max;
+        }
+    }
+
     /** 当前卖出单价（含动态收购衰减） */
     public double sellPrice() {
         double base = sellPrice != null
@@ -125,6 +144,15 @@ public final class ShopItem {
 
     public boolean isDynamicActive() {
         return dynamic && maxStock > 0 && ShopPlugin.getInstance().config().dynamicPricing();
+    }
+
+    /** 动态价格可能达到的最高倍率（用于防刷钱校验） */
+    public double dynamicMultiplierMax() {
+        if (!isDynamicActive()) {
+            return 1;
+        }
+        var cfg = ShopPlugin.getInstance().config();
+        return Math.max(1, Math.min(1 + cfg.dynamicCoefficient(), cfg.dynamicMax()));
     }
 
     /** 收购价是否因为卖太多而下跌 */

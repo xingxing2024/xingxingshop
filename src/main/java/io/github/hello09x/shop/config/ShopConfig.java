@@ -29,6 +29,9 @@ public final class ShopConfig {
     /** 是否启用每日限卖（收购菜单） */
     private boolean sellLimits = true;
 
+    /** 收购价高于购买价时自动压价，防止低买高卖刷钱 */
+    private boolean antiArbitrage = true;
+
     /** 交易记录数据库 */
     private String dbType = "sqlite";
     private String dbHost = "localhost";
@@ -64,13 +67,15 @@ public final class ShopConfig {
         FileConfiguration f = plugin.getConfig();
 
         this.currencyDefault = f.getString("currency", "vault");
-        this.sellRatio = f.getDouble("sell-ratio", 0.4);
+        this.sellRatio = clampNonNegative(f.getDouble("sell-ratio", 0.4), 0.4);
         this.limits = f.getBoolean("limits", true);
         this.dynamicPricing = f.getBoolean("dynamic-pricing", true);
-        this.dynamicCoefficient = f.getDouble("dynamic.coefficient", 0.5);
-        this.dynamicMin = f.getDouble("dynamic.min", 0.3);
-        this.dynamicMax = f.getDouble("dynamic.max", 3.0);
+        this.dynamicCoefficient = clampNonNegative(f.getDouble("dynamic.coefficient", 0.5), 0.5);
+        this.dynamicMin = clampNonNegative(f.getDouble("dynamic.min", 0.3), 0.3);
+        this.dynamicMax = Math.max(1, Math.max(dynamicMin,
+                clampNonNegative(f.getDouble("dynamic.max", 3.0), 3.0)));
         this.sellLimits = f.getBoolean("sell-limits", true);
+        this.antiArbitrage = f.getBoolean("anti-arbitrage", true);
         this.dbType = f.getString("database.type", "sqlite");
         this.dbHost = f.getString("database.mysql.host", "localhost");
         this.dbPort = f.getInt("database.mysql.port", 3306);
@@ -88,8 +93,16 @@ public final class ShopConfig {
         this.logAlertRate = f.getInt("log.alert.rate-limit", 20);
         this.logAlertAmount = f.getDouble("log.alert.amount", 10000);
         this.sellDynamic = f.getBoolean("sell-dynamic.enabled", true);
-        this.sellDynamicLimit = f.getDouble("sell-dynamic.limit", 2000);
-        this.sellDynamicMax = f.getDouble("sell-dynamic.max-drop", 0.6);
+        this.sellDynamicLimit = Math.max(1,
+                clampNonNegative(f.getDouble("sell-dynamic.limit", 2000), 2000));
+        this.sellDynamicMax = clampNonNegative(f.getDouble("sell-dynamic.max-drop", 0.6), 0.6);
+        if (this.sellDynamicMax > 1) {
+            this.sellDynamicMax = 1;
+        }
+    }
+
+    private static double clampNonNegative(double value, double fallback) {
+        return !Double.isFinite(value) || value < 0 ? fallback : value;
     }
 
     private static String mysqlUrl(String host, int port, String database) {
@@ -166,6 +179,10 @@ public final class ShopConfig {
 
     public boolean sellLimits() {
         return sellLimits;
+    }
+
+    public boolean antiArbitrage() {
+        return antiArbitrage;
     }
 
     public boolean sellDynamic() {

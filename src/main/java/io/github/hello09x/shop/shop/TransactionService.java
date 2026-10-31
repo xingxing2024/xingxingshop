@@ -99,6 +99,10 @@ public final class TransactionService {
 
         // 买得起的最大数量（钱不够就自动缩量）
         double unit = item.buyPrice();
+        if (!Double.isFinite(unit) || unit < 0) {
+            callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+            return;
+        }
         double balance = currency.balance(player);
         if (unit > 0) {
             int affordable = (int) Math.floor(balance / unit);
@@ -110,6 +114,10 @@ public final class TransactionService {
         }
 
         double total = round(unit * quantity);
+        if (!Double.isFinite(total) || total < 0) {
+            callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+            return;
+        }
 
         if (!currency.has(player, total) || !currency.withdraw(player, total)) {
             callback.accept(new Outcome(Result.NOT_ENOUGH_MONEY, currency.balance(player), name(item)));
@@ -162,9 +170,9 @@ public final class TransactionService {
 
                 double finalTotal = paid;
                 if (granted < wanted) {
-                    // 别的服先把库存/限购买走了，退还多扣的钱
-                    currency.deposit(player, round(unitPrice * (wanted - granted)));
+                    // 别的服先把库存/限购买走了，退还多扣的钱（按差额退，避免四舍五入误差）
                     finalTotal = round(unitPrice * granted);
+                    currency.deposit(player, paid - finalTotal);
                 }
 
                 plugin.stocks().applyReservation(item, reserved.stock(), reserved.stockSold());
@@ -226,7 +234,15 @@ public final class TransactionService {
         }
 
         double unit = item.sellPrice();
+        if (!Double.isFinite(unit) || unit < 0) {
+            callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+            return;
+        }
         double total = round(unit * quantity);
+        if (!Double.isFinite(total) || total < 0) {
+            callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+            return;
+        }
 
         int removed = take(player, item, quantity);
         if (removed < quantity) {
@@ -252,13 +268,6 @@ public final class TransactionService {
             return;
         }
 
-        // 跨服：先到账，异步占用限卖额度；失败就把钱扣回来、物品还给玩家
-        if (!currency.deposit(player, total)) {
-            give(player, item, quantity);
-            callback.accept(new Outcome(Result.ERROR, 0, name(item)));
-            return;
-        }
-
         final int wanted = quantity;
         final double unitPrice = unit;
         final double paid = total;
@@ -275,24 +284,29 @@ public final class TransactionService {
                 int granted = reserved.granted();
                 if (granted < 0) {
                     give(player, item, wanted);
-                    currency.withdraw(player, paid);
                     callback.accept(new Outcome(Result.ERROR, 0, name(item)));
                     return;
                 }
                 if (granted <= 0) {
                     give(player, item, wanted);
-                    currency.withdraw(player, paid);
                     callback.accept(new Outcome(Result.SELL_LIMIT_REACHED, item.sellLimit(), name(item)));
                     return;
                 }
 
                 double finalTotal = paid;
                 if (granted < wanted) {
-                    // 别的服先把限卖额度用掉了，把多扣的物品和钱还回去
-                    int unused = wanted - granted;
-                    give(player, item, unused);
-                    currency.withdraw(player, round(unitPrice * unused));
+                    // 别的服先把限卖额度用掉了，把多扣的物品还回去
+                    give(player, item, wanted - granted);
                     finalTotal = round(unitPrice * granted);
+                }
+
+                // 库存额度确认成功后才到账，避免「先到账、事务失败、钱已被花掉」
+                if (!currency.deposit(player, finalTotal)) {
+                    give(player, item, granted);
+                    db.releaseSell(item.shopId(), item.itemId(), uuid, day, item.key(),
+                            sellLimit, granted, Math.max(0, reserved.stock() - reserved.stockBefore()));
+                    callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+                    return;
                 }
 
                 plugin.stocks().applyReservation(item, reserved.stock(), reserved.stockSold());

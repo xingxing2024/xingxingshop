@@ -500,6 +500,13 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
         String shopId = args[1];
         double price = args.length > 2 ? parse(args[2], 0) : 0;
         int amount = args.length > 3 ? (int) parse(args[3], 1) : 1;
+        if (!Double.isFinite(price) || price < 0) {
+            sender.sendMessage(Text.color("&c买价无效"));
+            return true;
+        }
+        if (amount < 1) {
+            amount = 1;
+        }
 
         ItemStack hand = player.getInventory().getItemInMainHand();
         if (hand.getType() == Material.AIR) {
@@ -542,7 +549,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
         String path = "items." + itemId + ".";
         yaml.set(path + "material", hand.getType().name());
         yaml.set(path + "amount", Math.max(amount, hand.getAmount()));
-        yaml.set(path + "buy", price);
+        yaml.set(path + (shop.type() == Shop.Type.SELL ? "sell" : "buy"), price);
         yaml.set(path + "slot", shop.items().size());
         try {
             yaml.save(plugin.shops().fileOf(shop.id()));
@@ -595,7 +602,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         double price = parse(args[3], -1);
-        if (price < 0) {
+        if (!Double.isFinite(price) || price < 0) {
             sender.sendMessage(Text.color("&c价格无效"));
             return true;
         }
@@ -630,6 +637,9 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
         if (value < 0) {
             sender.sendMessage(Text.color("&c库存无效"));
             return true;
+        }
+        if (item.isLimitedStock() && value > item.maxStock()) {
+            value = item.maxStock();
         }
         item.stock(value);
         plugin.stocks().saveItem(item);

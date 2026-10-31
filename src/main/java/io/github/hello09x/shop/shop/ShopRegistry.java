@@ -99,6 +99,61 @@ public final class ShopRegistry {
                 plugin.getLogger().warning("加载 " + fileName + " 失败：" + t);
             }
         }
+        if (plugin.config().antiArbitrage()) {
+            enforceAntiArbitrage();
+        }
+    }
+
+    /**
+     * 防止低买高卖：收购菜单的价格不能高于购买菜单同款的最低买价。
+     */
+    private void enforceAntiArbitrage() {
+        for (Shop sellShop : byType(Shop.Type.SELL)) {
+            for (ShopItem sellItem : sellShop.items()) {
+                double minBuy = Double.MAX_VALUE;
+                for (Shop buyShop : byType(Shop.Type.BUY)) {
+                    for (ShopItem buyItem : buyShop.items()) {
+                        if (sameCurrency(sellItem, buyItem) && sameProduct(sellItem, buyItem)) {
+                            minBuy = Math.min(minBuy, buyItem.baseBuyPrice());
+                        }
+                    }
+                }
+                if (minBuy == Double.MAX_VALUE) {
+                    continue;
+                }
+                double allowed = minBuy / Math.max(1, sellItem.dynamicMultiplierMax());
+                if (sellItem.baseSellPrice() > allowed) {
+                    plugin.getLogger().warning("防刷钱：收购商店 " + sellShop.id() + " 的商品 "
+                            + sellItem.itemId() + " 收购价 " + sellItem.baseSellPrice()
+                            + " 高于安全上限 " + allowed + "，已自动压价");
+                    sellItem.capSellPrice(allowed);
+                }
+            }
+        }
+    }
+
+    private static boolean sameProduct(@NotNull ShopItem a, @NotNull ShopItem b) {
+        if (a.isCustom() || b.isCustom()) {
+            return a.isCustom() && b.isCustom()
+                    && a.reward(1).isSimilar(b.reward(1));
+        }
+        return a.material() == b.material();
+    }
+
+    private boolean sameCurrency(@NotNull ShopItem a, @NotNull ShopItem b) {
+        String ca = a.currencyId() != null ? a.currencyId() : plugin.config().currencyDefault();
+        String cb = b.currencyId() != null ? b.currencyId() : plugin.config().currencyDefault();
+        return ca.equalsIgnoreCase(cb);
+    }
+
+    private double sanitizePrice(double value, @NotNull String shopId,
+                                 @NotNull String itemId, @NotNull String key) {
+        if (!Double.isFinite(value) || value < 0) {
+            plugin.getLogger().warning(shopId + " 的商品 " + itemId
+                    + " 价格 " + key + " 无效（" + value + "），已按 0 处理");
+            return 0;
+        }
+        return value;
     }
 
     private @Nullable Shop load(@NotNull File file) {
@@ -209,6 +264,10 @@ public final class ShopRegistry {
                 : s.getDouble("price", 0);
         // 另一个价格（购买菜单里的 sell = 回收价，反之亦然）
         Double other = s.contains(otherKey) ? s.getDouble(otherKey) : null;
+        primaryRaw = sanitizePrice(primaryRaw, shopId, itemId, primaryKey);
+        if (other != null) {
+            other = sanitizePrice(other, shopId, itemId, otherKey);
+        }
 
         double buyPrice;
         Double sellPrice;
@@ -300,6 +359,7 @@ public final class ShopRegistry {
             return null;
         }
         double price = parts.length > 1 ? parse(parts[1], 0) : 0;
+        price = sanitizePrice(price, shopId, fixedItemId != null ? fixedItemId : parts[0], "price");
         boolean sell = type == Shop.Type.SELL;
 
         // 单价后面的 key=value 选项
@@ -346,10 +406,14 @@ public final class ShopRegistry {
         Double sellPrice;
         if (sell) {
             sellPrice = price;
-            buyPrice = opts.containsKey("buy") ? parse(opts.get("buy"), 0) : 0;
+            buyPrice = opts.containsKey("buy")
+                    ? sanitizePrice(parse(opts.get("buy"), 0), shopId, parts[0], "buy")
+                    : 0;
         } else {
             buyPrice = price;
-            sellPrice = opts.containsKey("sell") ? parse(opts.get("sell"), 0) : null;
+            sellPrice = opts.containsKey("sell")
+                    ? sanitizePrice(parse(opts.get("sell"), 0), shopId, parts[0], "sell")
+                    : null;
         }
 
         var display = customTemplate != null
