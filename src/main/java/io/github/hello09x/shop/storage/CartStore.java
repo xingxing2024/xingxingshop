@@ -34,6 +34,24 @@ public final class CartStore {
         }
     }
 
+    /** 减少数量，减到 0 或以下就整项移除。 */
+    public void remove(@NotNull UUID player, @NotNull String itemKey, int quantity) {
+        Map<String, Integer> cart = carts.get(player);
+        if (cart == null) {
+            return;
+        }
+        Integer current = cart.get(itemKey);
+        if (current == null) {
+            return;
+        }
+        int left = current - Math.max(1, quantity);
+        if (left <= 0) {
+            cart.remove(itemKey);
+        } else {
+            cart.put(itemKey, left);
+        }
+    }
+
     public @NotNull List<String> keys(@NotNull UUID player) {
         return List.copyOf(items(player).keySet());
     }

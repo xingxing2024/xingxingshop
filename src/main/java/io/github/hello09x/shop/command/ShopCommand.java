@@ -465,24 +465,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Text.color("&c用法：/shop cart <add|remove|list|clear|buy>"));
             return true;
         }
-        var cart = plugin.cart().items(player.getUniqueId());
-        if (cart.isEmpty()) {
-            sender.sendMessage(Text.color("&7购物车是空的"));
-            return true;
-        }
-        var transactions = new io.github.hello09x.shop.shop.TransactionService(plugin);
-        for (var entry : cart.entrySet()) {
-            int split = entry.getKey().indexOf(':');
-            Shop shop = split > 0 ? plugin.shops().get(entry.getKey().substring(0, split)) : null;
-            ShopItem item = shop == null ? null : shop.find(entry.getKey().substring(split + 1));
-            if (item == null || !shop.isOpen()) {
-                continue;
-            }
-            transactions.buy(player, shop, item, entry.getValue(),
-                    outcome -> transactions.notify(player, outcome, item, false));
-        }
-        plugin.cart().clear(player.getUniqueId());
-        sender.sendMessage(Text.color("&a购物车结算中…"));
+        new io.github.hello09x.shop.shop.CartService(plugin).checkout(player);
         return true;
     }
 

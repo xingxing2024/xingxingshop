@@ -34,6 +34,7 @@ public final class MainMenu implements InventoryHolder {
     private static final int BALANCE_SLOT = 49;
     private static final int HELP_SLOT = 50;
     private static final int CLOSE_SLOT = 53;
+    private static final int CART_SLOT = 40;
 
     private final ShopPlugin plugin;
     private final Player viewer;
@@ -92,6 +93,15 @@ public final class MainMenu implements InventoryHolder {
                         ? "&8在商店里用 /shop fav add 添加"
                         : "&b➤ 点击查看"));
 
+        // 购物车
+        int cartKinds = plugin.cart().items(viewer.getUniqueId()).size();
+        inventory.setItem(CART_SLOT, icon(Material.CHEST_MINECART,
+                "&b&l🛒 购物车",
+                "&8" + "▬".repeat(10),
+                cartKinds == 0 ? "&7购物车是空的" : "&7已选 &f" + cartKinds + " &7种商品",
+                "",
+                cartKinds == 0 ? "&8在商店里按 F 键加入" : "&b➤ 点击查看并结算"));
+
         // 余额
         var currency = plugin.currencies().getOrDefault(null);
         if (currency != null) {
@@ -134,6 +144,7 @@ public final class MainMenu implements InventoryHolder {
         switch (slot) {
             case BUY_SLOT -> plugin.gui().openList(viewer, Shop.Type.BUY);
             case FAVORITE_SLOT -> plugin.gui().openFavorites(viewer);
+            case CART_SLOT -> plugin.gui().openCart(viewer);
             case SELL_SLOT -> plugin.gui().openList(viewer, Shop.Type.SELL);
             case BALANCE_SLOT, HELP_SLOT -> render();
             case CLOSE_SLOT -> viewer.closeInventory();

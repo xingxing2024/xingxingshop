@@ -161,6 +161,13 @@ public final class ShopView implements InventoryHolder {
         inventory.setItem(CONTROL + 1, button(Material.COMPASS,
                 "&e返回主菜单", "&7查看全部分类"));
 
+        int cartKinds = plugin.cart().items(viewer.getUniqueId()).size();
+        inventory.setItem(CONTROL + 2, GuiStyle.glow(button(Material.CHEST_MINECART,
+                "&b&l购物车",
+                "&7已选 &f" + cartKinds + " &7种商品",
+                "",
+                "&b➤ 点击查看并结算")));
+
         if (page > 1) {
             inventory.setItem(CONTROL + 3, button(Material.ARROW,
                     "&e« 上一页", "&7第 &f" + (page - 1) + " &7页"));
@@ -179,7 +186,8 @@ public final class ShopView implements InventoryHolder {
                 selling ? "&e左键 &7卖 1 个" : "&e左键 &7买 1 个",
                 selling ? "&e右键 &7卖 1 组 (64)" : "&e右键 &7买 1 组 (64)",
                 selling ? "&eShift+左键 &7选数量卖" : "&eShift+左键 &7选数量买",
-                "&eF 键 / Shift+右键 &7收藏 / 取消收藏"));
+                "&eF 键 &7加入购物车",
+                "&eShift+右键 &7收藏 / 取消收藏"));
 
         inventory.setItem(CONTROL + 8, button(Material.BARRIER, "&c关闭", "&7点击关闭界面"));
     }
@@ -234,6 +242,10 @@ public final class ShopView implements InventoryHolder {
         lore.add(Text.color(plugin.favorites().contains(viewer.getUniqueId(), item.key())
                 ? "&b❤ 已收藏"
                 : "&8❤ 未收藏"));
+        int inCart = plugin.cart().items(viewer.getUniqueId()).getOrDefault(item.key(), 0);
+        if (inCart > 0) {
+            lore.add(Text.color("&b购物车中 &f" + inCart + " &7件"));
+        }
         lore.add(Text.color(GuiStyle.SEP));
 
         if (selling) {
@@ -307,7 +319,8 @@ public final class ShopView implements InventoryHolder {
             lore.add(Text.color("&e右键 &7买 1 组 (64)"));
         }
         lore.add(Text.color("&eShift+左键 &7聊天框输入数量"));
-        lore.add(Text.color("&eF 键 / Shift+右键 &7收藏 / 取消收藏"));
+        lore.add(Text.color("&eF 键 &7加入购物车"));
+        lore.add(Text.color("&eShift+右键 &7收藏 / 取消收藏"));
 
         meta.setLore(lore);
         stack.setItemMeta(meta);
@@ -405,6 +418,7 @@ public final class ShopView implements InventoryHolder {
         switch (slot) {
             case CONTROL, CONTROL + 7 -> render();
             case CONTROL + 1 -> plugin.gui().openEntry(viewer);
+            case CONTROL + 2 -> plugin.gui().openCart(viewer);
             case CONTROL + 3 -> {
                 if (page > 1) {
                     page--;
@@ -459,10 +473,22 @@ public final class ShopView implements InventoryHolder {
             // Shift+左键 / 中键：聊天框输入数量
             case SHIFT_LEFT, MIDDLE, NUMBER_KEY, DROP ->
                     plugin.chatInput().request(viewer, shop, item);
-            // F 键 / Shift+右键：收藏 / 取消收藏
-            case SWAP_OFFHAND, SHIFT_RIGHT -> toggleFavorite(item);
+            // F 键：加入购物车
+            case SWAP_OFFHAND -> addToCart(item);
+            // Shift+右键：收藏 / 取消收藏
+            case SHIFT_RIGHT -> toggleFavorite(item);
             default -> plugin.gui().openConfirm(viewer, shop, item, 1, selling);
         }
+    }
+
+    private void addToCart(@NotNull ShopItem item) {
+        var uuid = viewer.getUniqueId();
+        plugin.cart().add(uuid, item.key(), 1);
+        int now = plugin.cart().items(uuid).getOrDefault(item.key(), 0);
+        io.github.hello09x.shop.util.Sounds.play(viewer, "click");
+        viewer.sendMessage(Text.color("&b🛒 已加入购物车 &f" + item.displayName()
+                + " &7×1 &8(该项共 " + now + " 件)"));
+        render();
     }
 
     private void toggleFavorite(@NotNull ShopItem item) {

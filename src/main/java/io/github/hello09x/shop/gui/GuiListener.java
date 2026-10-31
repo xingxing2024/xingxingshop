@@ -46,8 +46,9 @@ public final class GuiListener implements Listener {
         AdminItemMenu edit = ShopGuiManager.asEdit(holder);
         SearchMenu search = ShopGuiManager.asSearch(holder);
         FavoriteMenu favorites = ShopGuiManager.asFavorites(holder);
+        CartMenu cart = ShopGuiManager.asCart(holder);
         if (view == null && menu == null && list == null && confirm == null && transactions == null
-                && edit == null && search == null && favorites == null) {
+                && edit == null && search == null && favorites == null && cart == null) {
             return;
         }
 
@@ -82,6 +83,8 @@ public final class GuiListener implements Listener {
             search.onClick(raw);
         } else if (favorites != null) {
             favorites.onClick(raw);
+        } else if (cart != null) {
+            cart.onClick(raw, event.getClick());
         } else if (view != null) {
             view.onClick(raw, event.getClick());
         } else if (list != null) {
@@ -115,7 +118,8 @@ public final class GuiListener implements Listener {
                 || ShopGuiManager.asTransactions(holder) != null
                 || ShopGuiManager.asEdit(holder) != null
                 || ShopGuiManager.asSearch(holder) != null
-                || ShopGuiManager.asFavorites(holder) != null;
+                || ShopGuiManager.asFavorites(holder) != null
+                || ShopGuiManager.asCart(holder) != null;
     }
 
 }
