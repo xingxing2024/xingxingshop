@@ -3,7 +3,6 @@ package io.github.hello09x.shop.gui;
 import io.github.hello09x.shop.ShopPlugin;
 import io.github.hello09x.shop.shop.Shop;
 import io.github.hello09x.shop.shop.ShopItem;
-import io.github.hello09x.shop.shop.TransactionService;
 import io.github.hello09x.shop.util.Schedulers;
 import io.github.hello09x.shop.util.Text;
 import io.papermc.paper.event.player.AsyncChatEvent;
@@ -20,17 +19,13 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 「聊天框输入数量」的等待队列。
- *
- * <p>玩家在商店里 Shift+左键点商品后，关闭界面、进入等待状态，
- * 下一条聊天内容会被当成数量解析。</p>
- */
+/** 聊天框输入：商品数量、购物车数量、搜索关键词。 */
 public final class ChatInputHandler implements Listener {
 
     private static final long TIMEOUT_TICKS = 20L * 30;
 
-    /** 等待输入中的玩家 */
+    private enum Mode { SHOP, CART, SEARCH }
+
     private final Map<UUID, Pending> pending = new ConcurrentHashMap<>();
 
     private final ShopPlugin plugin;
@@ -40,63 +35,65 @@ public final class ChatInputHandler implements Listener {
     }
 
     private static final class Pending {
-        final Shop shop;
-        final ShopItem item;
-        final boolean cartQuantity;
+        final Mode mode;
+        @Nullable final Shop shop;
+        @Nullable final ShopItem item;
         final long createdAt = System.currentTimeMillis();
 
-        Pending(Shop shop, ShopItem item, boolean cartQuantity) {
+        Pending(@NotNull Mode mode, @Nullable Shop shop, @Nullable ShopItem item) {
+            this.mode = mode;
             this.shop = shop;
             this.item = item;
-            this.cartQuantity = cartQuantity;
         }
     }
 
-    /**
-     * 进入等待输入状态
-     */
+    /** 商店里 Shift+左键：输入购买 / 出售数量 */
     public void request(@NotNull Player viewer, @NotNull Shop shop, @NotNull ShopItem item) {
         boolean selling = shop.type() == Shop.Type.SELL;
-
         viewer.closeInventory();
-        pending.put(viewer.getUniqueId(), new Pending(shop, item, false));
-
+        pending.put(viewer.getUniqueId(), new Pending(Mode.SHOP, shop, item));
         plugin.messages().send(viewer, "chat-input.prompt",
-                item.displayName(),
-                selling ? "卖出" : "购买");
+                item.displayName(), selling ? "卖出" : "购买");
+        scheduleTimeout(viewer);
+    }
 
-        // 超时清理
+    /** 购物车里设置数量 */
+    public void requestCartQuantity(@NotNull Player viewer, @NotNull Shop shop, @NotNull ShopItem item) {
+        viewer.closeInventory();
+        pending.put(viewer.getUniqueId(), new Pending(Mode.CART, shop, item));
+        viewer.sendMessage(Text.color("&e请在聊天框输入要设置的 &f" + item.displayName()
+                + " &e数量 &8(输入 cancel 取消)"));
+        scheduleTimeout(viewer);
+    }
+
+    /** 搜索关键词 */
+    public void requestSearch(@NotNull Player viewer) {
+        requestSearch(viewer, null);
+    }
+
+    /** 搜索关键词；从商店里打开时，取消后回到该商店 */
+    public void requestSearch(@NotNull Player viewer, @Nullable Shop returnShop) {
+        viewer.closeInventory();
+        pending.put(viewer.getUniqueId(), new Pending(Mode.SEARCH, returnShop, null));
+        viewer.sendMessage(Text.color("&e请在聊天框输入搜索关键词 &8(输入 cancel 取消)"));
+        scheduleTimeout(viewer);
+    }
+
+    private void scheduleTimeout(@NotNull Player viewer) {
         Schedulers.entityLater(plugin, viewer, () -> {
             Pending p = pending.get(viewer.getUniqueId());
             if (p != null && System.currentTimeMillis() - p.createdAt >= TIMEOUT_TICKS * 50) {
                 pending.remove(viewer.getUniqueId());
-                if (viewer.isOnline() && !(viewer.getOpenInventory().getTopInventory().getHolder()
-                        instanceof ShopView)) {
+                if (viewer.isOnline() && p.mode == Mode.SHOP
+                        && !(viewer.getOpenInventory().getTopInventory().getHolder() instanceof ShopView)) {
                     plugin.messages().send(viewer, "chat-input.timeout");
                 }
             }
         }, TIMEOUT_TICKS);
     }
 
-    /**
-     * 取消等待
-     */
     public void cancel(@NotNull Player viewer) {
         pending.remove(viewer.getUniqueId());
-    }
-
-    /** 购物车里直接设置某件商品的数量 */
-    public void requestCartQuantity(@NotNull Player viewer, @NotNull Shop shop, @NotNull ShopItem item) {
-        viewer.closeInventory();
-        pending.put(viewer.getUniqueId(), new Pending(shop, item, true));
-        viewer.sendMessage(Text.color("&e请在聊天框输入要设置的 &f" + item.displayName()
-                + " &e数量 &8(输入 cancel 取消)"));
-        Schedulers.entityLater(plugin, viewer, () -> {
-            Pending p = pending.get(viewer.getUniqueId());
-            if (p != null && System.currentTimeMillis() - p.createdAt >= TIMEOUT_TICKS * 50) {
-                pending.remove(viewer.getUniqueId());
-            }
-        }, TIMEOUT_TICKS);
     }
 
     @EventHandler
@@ -108,9 +105,6 @@ public final class ChatInputHandler implements Listener {
         return pending.containsKey(viewer.getUniqueId());
     }
 
-    /**
-     * 拦截聊天内容
-     */
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onChat(@NotNull AsyncChatEvent event) {
         Player player = event.getPlayer();
@@ -118,11 +112,8 @@ public final class ChatInputHandler implements Listener {
         if (p == null) {
             return;
         }
-
         event.setCancelled(true);
-        String input = PlainTextComponentSerializer.plainText()
-                .serialize(event.message()).trim();
-
+        String input = PlainTextComponentSerializer.plainText().serialize(event.message()).trim();
         Schedulers.entity(plugin, player, () -> apply(player, p, input));
     }
 
@@ -130,15 +121,23 @@ public final class ChatInputHandler implements Listener {
         if (!player.isOnline()) {
             return;
         }
-
-        // 取消
-        if (input.equalsIgnoreCase("cancel") || input.equals("取消") || input.equals("q")) {
-            plugin.messages().send(player, "chat-input.cancelled");
-            if (p.cartQuantity) {
-                plugin.gui().openCart(player);
+        boolean cancel = input.equalsIgnoreCase("cancel") || input.equals("取消") || input.equals("q");
+        if (p.mode == Mode.SEARCH) {
+            if (cancel || input.isBlank()) {
+                if (p.shop != null) {
+                    plugin.gui().open(player, p.shop);
+                } else {
+                    plugin.gui().openEntry(player);
+                }
             } else {
-                plugin.gui().open(player, p.shop);
+                plugin.gui().openSearch(player, input);
             }
+            return;
+        }
+
+        if (cancel) {
+            plugin.messages().send(player, "chat-input.cancelled");
+            back(player, p);
             return;
         }
 
@@ -147,50 +146,39 @@ public final class ChatInputHandler implements Listener {
             amount = Integer.parseInt(input);
         } catch (NumberFormatException e) {
             plugin.messages().send(player, "chat-input.invalid");
-            if (p.cartQuantity) {
-                plugin.gui().openCart(player);
-            } else {
-                plugin.gui().open(player, p.shop);
-            }
+            back(player, p);
             return;
         }
-
         if (amount <= 0) {
             plugin.messages().send(player, "chat-input.invalid");
-            if (p.cartQuantity) {
-                plugin.gui().openCart(player);
-            } else {
-                plugin.gui().open(player, p.shop);
-            }
+            back(player, p);
             return;
         }
+        amount = Math.min(amount, 100_000);
 
-        // 上限保护
-        if (amount > 100_000) {
-            amount = 100_000;
-        }
-
-        if (p.cartQuantity) {
+        if (p.mode == Mode.CART) {
+            assert p.item != null;
             plugin.cart().set(player.getUniqueId(), p.item.key(), amount);
             player.sendMessage(Text.color("&a已设置 &f" + p.item.displayName() + " &a数量为 &f" + amount));
             plugin.gui().openCart(player);
             return;
         }
 
-        // 走确认界面（防止误触）
+        assert p.shop != null && p.item != null;
         plugin.gui().openConfirm(player, p.shop, p.item, amount, p.shop.type() == Shop.Type.SELL);
     }
 
-    /**
-     * 界面标题：提示玩家正在输入
-     */
+    private void back(@NotNull Player player, @NotNull Pending p) {
+        if (p.mode == Mode.CART) {
+            plugin.gui().openCart(player);
+        } else if (p.shop != null) {
+            plugin.gui().open(player, p.shop);
+        } else {
+            plugin.gui().openEntry(player);
+        }
+    }
+
     public static @NotNull String promptHint(@NotNull ShopItem item) {
         return Text.color("&e请输入数量");
     }
-
-    @SuppressWarnings("unused")
-    private static @Nullable String unused(String s) {
-        return s;
-    }
-
 }

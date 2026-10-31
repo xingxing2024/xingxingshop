@@ -92,6 +92,12 @@ public final class ShopGuiManager {
         viewer.openInventory(menu.getInventory());
     }
 
+    public void openHelp(@NotNull Player viewer) {
+        io.github.hello09x.shop.util.Sounds.play(viewer, "open");
+        HelpMenu menu = new HelpMenu(plugin, viewer);
+        viewer.openInventory(menu.getInventory());
+    }
+
     public void openEntry(@NotNull Player viewer) {
         var shops = plugin.shops().all();
         if (shops.isEmpty()) {
@@ -163,6 +169,10 @@ public final class ShopGuiManager {
 
     public static @Nullable CartMenu asCart(@Nullable InventoryHolder holder) {
         return holder instanceof CartMenu m ? m : null;
+    }
+
+    public static @Nullable HelpMenu asHelp(@Nullable InventoryHolder holder) {
+        return holder instanceof HelpMenu m ? m : null;
     }
 
 

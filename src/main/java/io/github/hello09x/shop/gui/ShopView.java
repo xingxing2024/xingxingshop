@@ -134,6 +134,12 @@ public final class ShopView implements InventoryHolder {
                 "&e« 返回分类",
                 "&7回到" + (selling ? "收购" : "购买") + "分类列表"));
 
+        // 2：余额
+        Currency currency = plugin.currencies().getOrDefault(null);
+        inventory.setItem(2, button(Material.GOLD_INGOT,
+                "&6余额",
+                "&f" + (currency == null ? "无可用货币" : currency.format(currency.balance(viewer)))));
+
         // 4：当前分类
         long visibleItems = shop.sortedItems().stream()
                 .filter(item -> item.permission() == null || viewer.hasPermission(item.permission()))
@@ -143,6 +149,11 @@ public final class ShopView implements InventoryHolder {
                 "&7类型 &8| &f" + (selling ? "收购" : "购买"),
                 "&7商品 &8| &f" + visibleItems + " &7件"));
 
+        // 6：搜索
+        inventory.setItem(6, button(Material.COMPASS,
+                "&e搜索商品",
+                "&7输入关键词搜索全服商品"));
+
         // 8：回主菜单
         inventory.setItem(8, button(Material.NETHER_STAR,
                 "&e主菜单",
@@ -150,21 +161,14 @@ public final class ShopView implements InventoryHolder {
     }
 
     private void renderControlBar() {
-        Currency currency = plugin.currencies().getOrDefault(null);
         boolean selling = shop.type() == Shop.Type.SELL;
 
-        if (selling) {
-            inventory.setItem(CONTROL, button(Material.CHEST,
-                    "&6我的背包",
-                    "&7可卖物品 &f" + countSellable() + " &7种"));
-        } else {
-            inventory.setItem(CONTROL, button(Material.GOLD_INGOT,
-                    "&6我的余额",
-                    "&f" + (currency == null ? "无可用货币" : currency.format(currency.balance(viewer)))));
-        }
+        inventory.setItem(CONTROL, button(Material.COMPASS,
+                "&e« 返回分类",
+                "&7回到" + (selling ? "收购" : "购买") + "分类列表"));
 
-        inventory.setItem(CONTROL + 1, button(Material.COMPASS,
-                "&e返回主菜单", "&7查看全部分类"));
+        inventory.setItem(CONTROL + 1, button(Material.NETHER_STAR,
+                "&e主菜单", "&7回到商店首页"));
 
         int cartKinds = plugin.cart().items(viewer.getUniqueId()).size();
         if (!selling) {
@@ -188,25 +192,20 @@ public final class ShopView implements InventoryHolder {
                     "&e下一页 »", "&7第 &f" + (page + 1) + " &7页"));
         }
 
-        inventory.setItem(CONTROL + 7, button(Material.BOOK,
+        inventory.setItem(CONTROL + 6, button(Material.HEART_OF_THE_SEA,
+                "&b收藏夹",
+                "&7查看收藏的商品"));
+
+        inventory.setItem(CONTROL + 7, button(Material.KNOWLEDGE_BOOK,
                 selling ? "&b收购说明" : "&b购买说明",
-                selling ? "&e左键 &7卖 1 个" : "&e左键 &7买 1 个",
-                selling ? "&e右键 &7卖 1 组 (64)" : "&e右键 &7买 1 组 (64)",
-                selling ? "&eShift+左键 &7选数量卖" : "&eShift+左键 &7选数量买",
+                selling ? "&e左键 &7直接卖 1 个" : "&e左键 &7直接买 1 个",
+                selling ? "&e右键 &7全部卖出 &8[需确认]" : "&e右键 &7买 1 组 &8[需确认]",
+                "&eShift+左键 &7输入数量",
                 selling ? "&eShift+右键 &7收藏 / 取消收藏" : "&eF 键 &7加入购物车",
-                selling ? "" : "&eShift+右键 &7收藏 / 取消收藏"));
+                "",
+                "&8点击查看完整说明"));
 
         inventory.setItem(CONTROL + 8, button(Material.BARRIER, "&c关闭", "&7点击关闭界面"));
-    }
-
-    private int countSellable() {
-        int n = 0;
-        for (ShopItem item : shop.items()) {
-            if (TransactionService.count(viewer, item) > 0) {
-                n++;
-            }
-        }
-        return n;
     }
 
     // ================================================================
@@ -318,11 +317,11 @@ public final class ShopView implements InventoryHolder {
         }
 
         lore.add(Text.color(GuiStyle.SEP));
-        lore.add(Text.color("&e左键 &7" + (selling ? "卖 1 个" : "买 1 个")));
+        lore.add(Text.color("&e左键 &7直接" + (selling ? "卖 1 个" : "买 1 个")));
         if (selling) {
-            lore.add(Text.color("&e右键 &7全部卖出"));
+            lore.add(Text.color("&e右键 &7全部卖出 &8[需确认]"));
         } else {
-            lore.add(Text.color("&e右键 &7买 1 组 (64)"));
+            lore.add(Text.color("&e右键 &7买 1 组 (64) &8[需确认]"));
         }
         lore.add(Text.color("&eShift+左键 &7聊天框输入数量"));
         if (!selling) {
@@ -417,6 +416,10 @@ public final class ShopView implements InventoryHolder {
     private void handleHeader(int slot) {
         if (slot == 0) {
             plugin.gui().openList(viewer, shop.type());
+        } else if (slot == 2) {
+            render();
+        } else if (slot == 6) {
+            plugin.chatInput().requestSearch(viewer, shop);
         } else if (slot == 8) {
             plugin.gui().openEntry(viewer);
         }
@@ -424,7 +427,7 @@ public final class ShopView implements InventoryHolder {
 
     private void handleControl(int slot) {
         switch (slot) {
-            case CONTROL, CONTROL + 7 -> render();
+            case CONTROL -> plugin.gui().openList(viewer, shop.type());
             case CONTROL + 1 -> plugin.gui().openEntry(viewer);
             case CONTROL + 2 -> {
                 if (shop.type() == Shop.Type.BUY) {
@@ -446,6 +449,8 @@ public final class ShopView implements InventoryHolder {
                     render();
                 }
             }
+            case CONTROL + 6 -> plugin.gui().openFavorites(viewer);
+            case CONTROL + 7 -> plugin.gui().openHelp(viewer);
             case CONTROL + 8 -> viewer.closeInventory();
             default -> {
             }
@@ -467,8 +472,8 @@ public final class ShopView implements InventoryHolder {
         io.github.hello09x.shop.util.Sounds.play(viewer, "click");
 
         switch (click) {
-            // 左键：1 个 → 确认
-            case LEFT -> plugin.gui().openConfirm(viewer, shop, item, 1, selling);
+            // 左键：直接买 / 卖 1 个（不再弹确认）
+            case LEFT -> trade(item, 1, selling);
             // 右键：收购 = 全部卖出；购买 = 1 组，都先确认
             case RIGHT -> {
                 if (selling) {
@@ -493,7 +498,7 @@ public final class ShopView implements InventoryHolder {
             }
             // Shift+右键：收藏 / 取消收藏
             case SHIFT_RIGHT -> toggleFavorite(item);
-            default -> plugin.gui().openConfirm(viewer, shop, item, 1, selling);
+            default -> trade(item, 1, selling);
         }
     }
 

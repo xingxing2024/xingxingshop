@@ -29,12 +29,13 @@ import java.util.List;
 public final class MainMenu implements InventoryHolder {
 
     private static final int BUY_SLOT = 20;
-    private static final int FAVORITE_SLOT = 48;
+    private static final int SEARCH_SLOT = 22;
+    private static final int FAVORITE_SLOT = 45;
     private static final int SELL_SLOT = 24;
+    private static final int CART_SLOT = 47;
     private static final int BALANCE_SLOT = 49;
-    private static final int HELP_SLOT = 50;
+    private static final int HELP_SLOT = 51;
     private static final int CLOSE_SLOT = 53;
-    private static final int CART_SLOT = 40;
 
     private final ShopPlugin plugin;
     private final Player viewer;
@@ -82,6 +83,14 @@ public final class MainMenu implements InventoryHolder {
                 "",
                 "&6➤ 点击进入")));
 
+        // 搜索
+        inventory.setItem(SEARCH_SLOT, icon(Material.COMPASS,
+                "&e&l搜索商品",
+                "&8" + "▬".repeat(10),
+                "&7输入关键词，搜索全服商品",
+                "",
+                "&e➤ 点击开始搜索"));
+
         // 收藏夹
         int favorites = plugin.favorites().list(viewer.getUniqueId()).size();
         ItemStack favoriteIcon = icon(Material.HEART_OF_THE_SEA,
@@ -124,11 +133,12 @@ public final class MainMenu implements InventoryHolder {
         inventory.setItem(HELP_SLOT, icon(Material.KNOWLEDGE_BOOK,
                 "&e&l操作说明",
                 "&8" + "▬".repeat(10),
-                "&f左键 &7» 买/卖 &f1 个",
-                "&f右键 &7» 购买=买 &f1 组(64)&7，收购=&f全部卖出",
-                "&fShift+左键 &7» 聊天框输入数量",
+                "&f左键 &7» 直接买/卖 &f1 个",
+                "&f右键 &7» 买 1 组 / 全部卖出 &7(需确认)",
+                "&fShift+左键 &7» 输入数量",
+                "&fF / Shift+右键 &7» 购物车 / 收藏",
                 "",
-                "&8输入 /shop help 查看全部指令"));
+                "&e➤ 点击查看完整说明"));
 
         inventory.setItem(CLOSE_SLOT, icon(Material.BARRIER, "&c&l关闭", "&7点击关闭界面"));
     }
@@ -145,10 +155,12 @@ public final class MainMenu implements InventoryHolder {
     public void onClick(int slot) {
         switch (slot) {
             case BUY_SLOT -> plugin.gui().openList(viewer, Shop.Type.BUY);
+            case SEARCH_SLOT -> plugin.chatInput().requestSearch(viewer);
             case FAVORITE_SLOT -> plugin.gui().openFavorites(viewer);
             case CART_SLOT -> plugin.gui().openCart(viewer);
             case SELL_SLOT -> plugin.gui().openList(viewer, Shop.Type.SELL);
-            case BALANCE_SLOT, HELP_SLOT -> render();
+            case BALANCE_SLOT -> render();
+            case HELP_SLOT -> plugin.gui().openHelp(viewer);
             case CLOSE_SLOT -> viewer.closeInventory();
             default -> {
             }
