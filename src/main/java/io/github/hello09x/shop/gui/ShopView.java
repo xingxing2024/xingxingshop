@@ -178,7 +178,8 @@ public final class ShopView implements InventoryHolder {
                 selling ? "&b收购说明" : "&b购买说明",
                 selling ? "&e左键 &7卖 1 个" : "&e左键 &7买 1 个",
                 selling ? "&e右键 &7卖 1 组 (64)" : "&e右键 &7买 1 组 (64)",
-                selling ? "&eShift+左键 &7选数量卖" : "&eShift+左键 &7选数量买"));
+                selling ? "&eShift+左键 &7选数量卖" : "&eShift+左键 &7选数量买",
+                "&dF 键 / Shift+右键 &7收藏 / 取消收藏"));
 
         inventory.setItem(CONTROL + 8, button(Material.BARRIER, "&c关闭", "&7点击关闭界面"));
     }
@@ -230,6 +231,9 @@ public final class ShopView implements InventoryHolder {
         if (item.isVipPlayer(viewer)) {
             lore.add(Text.color("&6VIP 专享价"));
         }
+        lore.add(Text.color(plugin.favorites().contains(viewer.getUniqueId(), item.key())
+                ? "&d❤ 已收藏"
+                : "&8❤ 未收藏"));
         lore.add(Text.color(GuiStyle.SEP));
 
         if (selling) {
@@ -303,6 +307,7 @@ public final class ShopView implements InventoryHolder {
             lore.add(Text.color("&e右键 &7买 1 组 (64)"));
         }
         lore.add(Text.color("&eShift+左键 &7聊天框输入数量"));
+        lore.add(Text.color("&dF 键 / Shift+右键 &7收藏 / 取消收藏"));
 
         meta.setLore(lore);
         stack.setItemMeta(meta);
@@ -452,10 +457,30 @@ public final class ShopView implements InventoryHolder {
                 }
             }
             // Shift+左键 / 中键：聊天框输入数量
-            case SHIFT_LEFT, SHIFT_RIGHT, MIDDLE, NUMBER_KEY, DROP ->
+            case SHIFT_LEFT, MIDDLE, NUMBER_KEY, DROP ->
                     plugin.chatInput().request(viewer, shop, item);
+            // F 键 / Shift+右键：收藏 / 取消收藏
+            case SWAP_OFFHAND, SHIFT_RIGHT -> toggleFavorite(item);
             default -> plugin.gui().openConfirm(viewer, shop, item, 1, selling);
         }
+    }
+
+    private void toggleFavorite(@NotNull ShopItem item) {
+        var favorites = plugin.favorites();
+        var uuid = viewer.getUniqueId();
+        boolean now;
+        if (favorites.contains(uuid, item.key())) {
+            favorites.remove(uuid, item.key());
+            now = false;
+        } else {
+            favorites.add(uuid, item.key());
+            now = true;
+        }
+        io.github.hello09x.shop.util.Sounds.play(viewer, "click");
+        viewer.sendMessage(Text.color(now
+                ? "&d❤ 已收藏 &f" + item.displayName()
+                : "&7已取消收藏 &f" + item.displayName()));
+        render();
     }
 
     /**
