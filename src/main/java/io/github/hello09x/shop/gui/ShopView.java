@@ -239,34 +239,34 @@ public final class ShopView implements InventoryHolder {
         boolean favorited = plugin.favorites().contains(viewer.getUniqueId(), item.key());
         int inCart = plugin.cart().items(viewer.getUniqueId()).getOrDefault(item.key(), 0);
 
-        // 顶部状态徽章：折扣 / VIP / 收藏 / 购物车
-        List<String> badges = new ArrayList<>();
+        // 状态徽章：只有存在时才占一行
+        List<String> status = new ArrayList<>();
         if (item.hasDiscount() && base > unit + 0.0001) {
             int percent = (int) Math.round((1 - unit / base) * 100);
-            badges.add("&a✦ 限时 -" + percent + "%");
+            status.add("&a✦ 限时 -" + percent + "%");
         }
         if (item.isVipPlayer(viewer)) {
-            badges.add("&6✦ VIP");
+            status.add("&6✦ VIP");
         }
         if (favorited) {
-            badges.add("&b❤ 已收藏");
+            status.add("&b❤ 已收藏");
         }
         if (inCart > 0) {
-            badges.add("&b🛒 " + inCart);
+            status.add("&d🛒 " + inCart);
         }
-        if (!badges.isEmpty()) {
-            lore.add(Text.color(String.join("  &8|  ", badges)));
+        if (!status.isEmpty()) {
+            lore.add(Text.color(String.join("   ", status)));
         }
 
-        lore.add(Text.color(GuiStyle.SEP));
-        lore.add(Text.color("&7单价 &f" + price + " &8/ 个"));
+        // 价格：一行放单价，折扣时附带划线原价
+        String priceLine = "&7价格 &f" + price + " &8/ 个";
         if (item.hasDiscount() && base > unit + 0.0001) {
-            lore.add(Text.color("&8原价 &m" + formatPrice(currency, base)));
+            priceLine += "   &8原价 &m" + formatPrice(currency, base);
         }
+        lore.add(Text.color(priceLine));
 
         if (selling) {
             int have = TransactionService.count(viewer, item);
-            lore.add(Text.color("&a左键 &7卖 1 个 &8» &a" + price));
             if (have > 0) {
                 int sellable = have;
                 if (item.isSellLimited()) {
@@ -274,39 +274,37 @@ public final class ShopView implements InventoryHolder {
                     sellable = (int) Math.min(have, Math.max(0, left));
                 }
                 double total = unit * sellable;
-                lore.add(Text.color("&e右键 &7全部卖出 &8(&f" + sellable + " &7个) &8» &a"
+                lore.add(Text.color("&7可卖 &f" + sellable + " &8→ &a"
                         + formatPrice(currency, total)));
             } else {
-                lore.add(Text.color("&e右键 &7全部卖出 &8» &8背包为空"));
+                lore.add(Text.color("&8背包里没有这种物品"));
             }
         } else {
             double p64 = unit * 64;
-            lore.add(Text.color("&a左键 &7买 1 个 &8» &e" + price));
-            lore.add(Text.color("&e右键 &7买 1 组 &8×64 &7» &e" + formatPrice(currency, p64)));
+            lore.add(Text.color("&7整组 &8×64 &8→ &e" + formatPrice(currency, p64)));
         }
 
+        // 库存 / 补货 / 行情 / 限购
         if (item.isLimitedStock()) {
             int stock = item.stock();
             int max = Math.max(1, item.maxStock());
             String color = stock <= 0 ? "&c" : stock <= max / 4 ? "&e" : "&a";
-            String text = "&7库存 " + color + GuiStyle.bar(stock, max, 10)
+            String line = "&7库存 " + color + GuiStyle.bar(stock, max, 10)
                     + " &f" + stock + "&7/&f" + max;
             if (item.hasRestock() && stock < max) {
                 long left = item.nextRestockAt() - System.currentTimeMillis();
-                text += "   &7补货 &f" + (left <= 0 ? "即将" : formatRestock(left));
+                line += "   &8补货 &7" + (left <= 0 ? "即将" : formatRestock(left));
             }
-            lore.add(Text.color(text));
+            lore.add(Text.color(line));
         }
 
         if (item.isDynamicActive()) {
             if (selling) {
-                lore.add(Text.color(item.isStockDown()
-                        ? "&7行情 &c▲ 收购价下跌" : "&7行情 &8▸ 随市场浮动"));
+                lore.add(Text.color(item.isStockDown() ? "&7行情 &c▲ 下跌" : "&7行情 &8▸ 随市场浮动"));
             } else {
                 int max = Math.max(1, item.maxStock());
                 double ratio = (double) (max - item.stock()) / max;
-                lore.add(Text.color(ratio > 0.1
-                        ? "&7行情 &c▲ 库存紧张" : "&7行情 &a▼ 价格平稳"));
+                lore.add(Text.color(ratio > 0.1 ? "&7行情 &c▲ 库存紧张" : "&7行情 &a▼ 价格平稳"));
             }
         }
 
@@ -314,20 +312,28 @@ public final class ShopView implements InventoryHolder {
             long left = plugin.limits().remaining(viewer.getUniqueId(), item);
             lore.add(Text.color(left <= 0
                     ? "&c今日限购已满"
-                    : "&7今日限购 &f" + item.limit() + " &8(剩余 &f" + left + "&8)"));
+                    : "&7限购 &f" + item.limit() + "&7/天   &8剩余 &f" + left));
         }
         if (selling && item.isSellLimited()) {
             long left = plugin.limits().sellRemaining(viewer.getUniqueId(), item);
             lore.add(Text.color(left <= 0
-                    ? "&c今日限卖已满 &8(" + item.sellLimit() + ")"
-                    : "&7今日限卖 &f" + item.sellLimit() + " &8(剩余 &f" + left + "&8)"));
+                    ? "&c今日限卖已满"
+                    : "&7限卖 &f" + item.sellLimit() + "&7/天   &8剩余 &f" + left));
         }
 
         lore.add(Text.color(GuiStyle.SEP));
-        lore.add(Text.color("&bShift+左键 &7输入数量  &8|  &bShift+右键 &7收藏 / 取消"));
-        if (!selling) {
-            lore.add(Text.color("&dF &7加入购物车"));
+        if (selling) {
+            lore.add(Text.color("&a左键 &7卖 1 个"));
+            lore.add(Text.color("&e右键 &7全部卖出"));
+            lore.add(Text.color("&bShift+左键 &7输入数量"));
+            lore.add(Text.color("&bShift+右键 &7收藏 / 取消收藏"));
+        } else {
+            lore.add(Text.color("&a左键 &7买 1 个"));
+            lore.add(Text.color("&e右键 &7买 1 组 &8(64)"));
+            lore.add(Text.color("&bShift+左键 &7输入数量"));
+            lore.add(Text.color("&dF &7加入购物车   &8|   &bShift+右键 &7收藏"));
         }
+
         meta.setLore(lore);
         stack.setItemMeta(meta);
         return stack;
