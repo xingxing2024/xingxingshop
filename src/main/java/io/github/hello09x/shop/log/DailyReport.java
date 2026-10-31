@@ -1,6 +1,7 @@
 package io.github.hello09x.shop.log;
 
 import io.github.hello09x.shop.ShopPlugin;
+import io.github.hello09x.shop.util.Schedulers;
 import io.github.hello09x.shop.util.Text;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -599,7 +600,7 @@ public final class DailyReport {
         long delayTicks = Math.max(20L, delaySeconds * 20L);
         long periodTicks = 20L * 60 * 60 * 24;   // 24 小时
 
-        Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+        Schedulers.globalTimer(plugin, () -> {
             // 汇总「昨天」
             LocalDate today = LocalDate.now();
             LocalDate from = today.minusDays(1);

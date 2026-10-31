@@ -5,6 +5,7 @@ api-version: '1.20'
 authors: [ xingxing ]
 description: 'GUI 商店：购买 / 收购分离，支持 Vault、点券、库存、动态价格与每日限购'
 website: 'https://github.com/xingxing2024'
+folia-supported: true
 
 softdepend:
   - TrMenu

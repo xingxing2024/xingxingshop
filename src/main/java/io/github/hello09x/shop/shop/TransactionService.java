@@ -3,7 +3,7 @@ package io.github.hello09x.shop.shop;
 import io.github.hello09x.shop.ShopPlugin;
 import io.github.hello09x.shop.currency.Currency;
 import io.github.hello09x.shop.util.Messages;
-import org.bukkit.Bukkit;
+import io.github.hello09x.shop.util.Schedulers;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -163,7 +163,7 @@ public final class TransactionService {
                 var reserved = db.reserveBuy(item.shopId(), item.itemId(), item.maxStock(),
                         uuid, day, item.key(), limit, wanted);
 
-                runSync(() -> {
+                runSync(player, () -> {
                     int granted = reserved.granted();
                     if (granted < 0) {
                         currency.deposit(player, paid);
@@ -305,7 +305,7 @@ public final class TransactionService {
                 var reserved = db.reserveSell(item.shopId(), item.itemId(), item.maxStock(),
                         uuid, day, item.key(), sellLimit, wanted);
 
-                runSync(() -> {
+                runSync(player, () -> {
                     int granted = reserved.granted();
                     if (granted < 0) {
                         give(player, item, wanted);
@@ -351,8 +351,8 @@ public final class TransactionService {
         }
     }
 
-    /** 把异步结果切回主线程；关服时排队，由 onDisable 在主线程执行 */
-    private void runSync(@NotNull Runnable task) {
+    /** 把异步结果切回玩家所属线程；关服时排队，由 onDisable 执行 */
+    private void runSync(@NotNull Player player, @NotNull Runnable task) {
         Runnable wrapped = () -> {
             try {
                 task.run();
@@ -365,7 +365,7 @@ public final class TransactionService {
             return;
         }
         try {
-            Bukkit.getScheduler().runTask(plugin, wrapped);
+            Schedulers.entity(plugin, player, wrapped);
         } catch (Throwable t) {
             plugin.enqueueTradeCompletion(wrapped);
         }

@@ -4,10 +4,10 @@ import io.github.hello09x.shop.ShopPlugin;
 import io.github.hello09x.shop.shop.Shop;
 import io.github.hello09x.shop.shop.ShopItem;
 import io.github.hello09x.shop.shop.TransactionService;
+import io.github.hello09x.shop.util.Schedulers;
 import io.github.hello09x.shop.util.Text;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
-import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -63,7 +63,7 @@ public final class ChatInputHandler implements Listener {
                 selling ? "卖出" : "购买");
 
         // 超时清理
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+        Schedulers.entityLater(plugin, viewer, () -> {
             Pending p = pending.get(viewer.getUniqueId());
             if (p != null && System.currentTimeMillis() - p.createdAt >= TIMEOUT_TICKS * 50) {
                 pending.remove(viewer.getUniqueId());
@@ -101,7 +101,7 @@ public final class ChatInputHandler implements Listener {
         String input = PlainTextComponentSerializer.plainText()
                 .serialize(event.message()).trim();
 
-        Bukkit.getScheduler().runTask(plugin, () -> apply(player, p, input));
+        Schedulers.entity(plugin, player, () -> apply(player, p, input));
     }
 
     private void apply(@NotNull Player player, @NotNull Pending p, @NotNull String input) {

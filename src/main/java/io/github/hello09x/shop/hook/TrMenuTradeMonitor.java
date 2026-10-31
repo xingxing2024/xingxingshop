@@ -1,6 +1,7 @@
 package io.github.hello09x.shop.hook;
 
 import io.github.hello09x.shop.ShopPlugin;
+import io.github.hello09x.shop.util.Schedulers;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.*;
@@ -34,6 +35,10 @@ public final class TrMenuTradeMonitor implements AutoCloseable {
     public TrMenuTradeMonitor(ShopPlugin plugin) { this.plugin = plugin; }
 
     public void start() {
+        if (Schedulers.isFolia()) {
+            plugin.getLogger().info("Folia 环境已跳过 TrMenu 交易记录监听。");
+            return;
+        }
         if (!plugin.getConfig().getBoolean("external-trades.trmenu.enabled", true)) return;
         Plugin trMenu = Bukkit.getPluginManager().getPlugin("TrMenu");
         Plugin vault = Bukkit.getPluginManager().getPlugin("Vault");

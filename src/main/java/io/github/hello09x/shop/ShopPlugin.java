@@ -16,6 +16,7 @@ import io.github.hello09x.shop.shop.ShopRegistry;
 import io.github.hello09x.shop.storage.FavoriteStore;
 import io.github.hello09x.shop.storage.ShopSync;
 import io.github.hello09x.shop.storage.StockStore;import io.github.hello09x.shop.util.Messages;
+import io.github.hello09x.shop.util.Schedulers;
 import org.bukkit.Bukkit;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -135,7 +136,7 @@ public final class ShopPlugin extends JavaPlugin {
         // Vault 会在自己 onEnable 里注册 Economy 服务，而本插件是 softdepend，
         // 启用顺序不保证，立即探测会得到「装了 Vault 但没有经济实现」的假象。
         this.currencies = new CurrencyManager(this);
-        Bukkit.getScheduler().runTaskLater(this, () -> {
+        Schedulers.globalLater(this, () -> {
             currencies.detect();
             externalMonitor = new io.github.hello09x.shop.hook.TrMenuTradeMonitor(this);
             externalMonitor.start();
@@ -147,7 +148,7 @@ public final class ShopPlugin extends JavaPlugin {
 
         // 定时维护：清理过期限购 + 库存落盘
         long period = 20L * 60 * 30;
-        Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
+        Schedulers.asyncTimer(this, () -> {
             try {
                 limits.cleanup();
             } catch (Throwable t) {
@@ -162,14 +163,14 @@ public final class ShopPlugin extends JavaPlugin {
 
         // 跨服：定时从数据库刷新内存缓存，保证别的服的买卖能及时显示
         if (transactionLog.database().shared()) {
-            Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
+            Schedulers.asyncTimer(this, () -> {
                 try {
                     stocks.refresh();
                 } catch (Throwable t) {
                     getLogger().warning("刷新跨服库存失败：" + t.getMessage());
                 }
             }, 100L, 100L);
-            Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
+            Schedulers.asyncTimer(this, () -> {
                 try {
                     limits.refresh();
                 } catch (Throwable t) {
@@ -179,24 +180,26 @@ public final class ShopPlugin extends JavaPlugin {
         }
 
         // 界面每 2 秒刷新一次库存 / 余额 / 限购，跨服也能看到别的服的库存变化
-        Bukkit.getScheduler().runTaskTimer(this, () -> {
+        Schedulers.globalTimer(this, () -> {
             for (var player : Bukkit.getOnlinePlayers()) {
-                var holder = player.getOpenInventory().getTopInventory().getHolder();
-                if (holder instanceof ShopView view && view.viewer().equals(player)) {
-                    view.refreshView();
-                }
+                Schedulers.entity(this, player, () -> {
+                    var holder = player.getOpenInventory().getTopInventory().getHolder();
+                    if (holder instanceof ShopView view && view.viewer().equals(player)) {
+                        view.refreshView();
+                    }
+                });
             }
         }, 40L, 40L);
 
         // MySQL 启动时没连上：每分钟重试一次，连上后自动接管库存 / 限购
-        Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
+        Schedulers.asyncTimer(this, () -> {
             var db = transactionLog.database();
             if (db.type() != io.github.hello09x.shop.log.TransactionDatabase.Type.MYSQL || db.available()) {
                 return;
             }
             db.init();
             if (db.available()) {
-                Bukkit.getScheduler().runTask(this, () -> {
+                Schedulers.global(this, () -> {
                     try {
                         stocks.load();
                         limits.load();
@@ -208,13 +211,13 @@ public final class ShopPlugin extends JavaPlugin {
         }, 1200L, 1200L);
 
         // 跨服商店配置轮询
-        Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
+        Schedulers.asyncTimer(this, () -> {
             if (shopSync == null || !shopSync.enabled()) {
                 return;
             }
             try {
                 if (shopSync.poll()) {
-                    Bukkit.getScheduler().runTask(this, () -> {
+                    Schedulers.global(this, () -> {
                         shops.loadAll();
                         stocks.load();
                         limits.load();
@@ -232,7 +235,7 @@ public final class ShopPlugin extends JavaPlugin {
         dailyReport.startScheduler();
 
         // GitHub 新版本检查（异步，不阻塞启动）
-        Bukkit.getScheduler().runTaskAsynchronously(this,
+        Schedulers.async(this,
                 () -> io.github.hello09x.shop.util.UpdateChecker.checkAsync(this));
 
         getLogger().info("启用完成，用时 " + (System.currentTimeMillis() - start) + " ms，"

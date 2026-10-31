@@ -1,7 +1,7 @@
 package io.github.hello09x.shop.listener;
 
 import io.github.hello09x.shop.ShopPlugin;
-import org.bukkit.Bukkit;
+import io.github.hello09x.shop.util.Schedulers;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -23,7 +23,7 @@ public final class PlayerJoinListener implements Listener {
     public void onJoin(@NotNull PlayerJoinEvent event) {
         var player = event.getPlayer();
         // 延后 2 秒，等玩家完全进服再发，避免被登录消息刷掉
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+        Schedulers.entityLater(plugin, player, () -> {
             if (!player.isOnline()) {
                 return;
             }
