@@ -29,7 +29,7 @@ import java.util.List;
 public final class MainMenu implements InventoryHolder {
 
     private static final int BUY_SLOT = 20;
-    private static final int FAVORITE_SLOT = 22;
+    private static final int FAVORITE_SLOT = 48;
     private static final int SELL_SLOT = 24;
     private static final int BALANCE_SLOT = 49;
     private static final int HELP_SLOT = 50;

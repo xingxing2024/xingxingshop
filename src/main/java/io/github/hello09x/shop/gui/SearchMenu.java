@@ -86,6 +86,7 @@ public final class SearchMenu implements InventoryHolder {
                 "&7共 &f" + hits.size() + " &7个结果"));
         if (page < pages) inventory.setItem(53, button(Material.ARROW, "&e下一页 »"));
         inventory.setItem(48, button(Material.BARRIER, "&c关闭"));
+        inventory.setItem(50, button(Material.COMPASS, "&e« 返回主菜单", "&7回到商店首页"));
     }
 
     private @NotNull ItemStack icon(@NotNull Hit hit) {
@@ -126,6 +127,8 @@ public final class SearchMenu implements InventoryHolder {
             render();
         } else if (slot == 48) {
             viewer.closeInventory();
+        } else if (slot == 50) {
+            plugin.gui().openEntry(viewer);
         } else if (slot >= ITEM_START && slot < ITEM_START + PAGE_SIZE) {
             int index = (page - 1) * PAGE_SIZE + (slot - ITEM_START);
             if (index < hits.size()) {

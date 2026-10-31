@@ -88,6 +88,7 @@ public final class CartMenu implements InventoryHolder {
             inventory.setItem(45, GuiStyle.button(Material.ARROW, "&e« 上一页"));
         }
         inventory.setItem(48, GuiStyle.button(Material.BARRIER, "&c关闭", "&7点击关闭界面"));
+        inventory.setItem(47, GuiStyle.button(Material.COMPASS, "&e« 返回主菜单", "&7回到商店首页"));
         inventory.setItem(49, GuiStyle.glow(GuiStyle.button(Material.LIME_CONCRETE,
                 "&a&l✔ 结算",
                 "&8" + "▬".repeat(10),
@@ -148,6 +149,10 @@ public final class CartMenu implements InventoryHolder {
         }
         if (slot == 48) {
             viewer.closeInventory();
+            return;
+        }
+        if (slot == 47) {
+            plugin.gui().openEntry(viewer);
             return;
         }
         if (slot == 49) {
