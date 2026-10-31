@@ -159,18 +159,34 @@ public final class TransactionLog {
     /** 登记已完成的外部交易，不扣款、不发货；由调用者在主线程确认成交后调用。 */
     public void recordExternal(Player player, String source, String itemId, String itemName,
                                String currency, boolean buying, int quantity, double total) {
+        recordExternalId(player, source, itemId, itemName, currency, buying, quantity, total, null);
+    }
+
+    /**
+     * 登记外部交易；externalId 非空时同一 ID 只记录一次（跨重启、跨服）。
+     */
+    public boolean recordExternalId(Player player, String source, String itemId, String itemName,
+                                    String currency, boolean buying, int quantity, double total,
+                                    @Nullable String externalId) {
         if (!source.matches("[A-Za-z0-9_-]{1,48}") || itemId.isBlank() || itemId.length() > 64
                 || itemName.isBlank() || itemName.length() > 64 || currency.isBlank() || currency.length() > 32
                 || quantity <= 0 || !Double.isFinite(total) || total < 0) {
             throw new IllegalArgumentException("外部交易参数无效");
+        }
+        if (externalId != null && !externalId.matches("[A-Za-z0-9:_-]{1,128}")) {
+            throw new IllegalArgumentException("外部交易 ID 无效");
+        }
+        if (externalId != null && database.externalExists(externalId)) {
+            return false;
         }
         Record rec = new Record(System.currentTimeMillis(), player.getName(), player.getUniqueId(),
                 "external:" + source, itemId, itemName, currency, buying, quantity, total / quantity, total, false);
         recent.addFirst(rec);
         while (recent.size() > MEMORY_LIMIT) recent.pollLast();
         writeToFile(rec);
-        database.insert(rec);
+        database.insert(rec, externalId);
         checkAnomaly(player, rec);
+        return true;
     }
 
     private void writeToFile(@NotNull Record rec) {

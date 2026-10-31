@@ -34,7 +34,8 @@ public final class GuiListener implements Listener {
         MainMenu menu = ShopGuiManager.asMenu(holder);
         ShopListMenu list = ShopGuiManager.asList(holder);
         ConfirmView confirm = ShopGuiManager.asConfirm(holder);
-        if (view == null && menu == null && list == null && confirm == null) {
+        TransactionMenu transactions = ShopGuiManager.asTransactions(holder);
+        if (view == null && menu == null && list == null && confirm == null && transactions == null) {
             return;
         }
 
@@ -52,6 +53,8 @@ public final class GuiListener implements Listener {
 
         if (confirm != null) {
             confirm.onClick(raw);
+        } else if (transactions != null) {
+            transactions.onClick(raw);
         } else if (view != null) {
             view.onClick(raw, event.getClick());
         } else if (list != null) {
@@ -81,7 +84,8 @@ public final class GuiListener implements Listener {
         return ShopGuiManager.asView(holder) != null
                 || ShopGuiManager.asMenu(holder) != null
                 || ShopGuiManager.asList(holder) != null
-                || ShopGuiManager.asConfirm(holder) != null;
+                || ShopGuiManager.asConfirm(holder) != null
+                || ShopGuiManager.asTransactions(holder) != null;
     }
 
 }

@@ -1,4 +1,4 @@
-# XingXingShop
+﻿# XingXingShop
 
 > 面向 **Paper / Purpur 1.20.6 ~ 26.x** 的 GUI 商店插件：购买 / 收购分离、MySQL 跨服、库存限购、动态价格、自定义物品、折扣 VIP、交易日报。
 
@@ -38,6 +38,8 @@
 - 库存、动态价格、每日限购、每日限卖
 - 商品搜索、收藏、最近购买
 - 限时折扣、VIP 专属价格
+- 商品自动补货
+- 管理员交易记录面板 `/shop log gui`
 - 音效全部可配置
 
 ### 数据与跨服
@@ -74,7 +76,7 @@
 1. 服务端：**Paper / Purpur 1.20.6 ~ 26.x**
 2. Java：**21+**
 3. 安装 **Vault** + 任意经济插件（EssentialsX / CMI / XConomy 等）
-4. 把 `XingXingShop-1.0.6.jar` 放进 `plugins/`
+4. 把 `XingXingShop-1.0.7.jar` 放进 `plugins/`
 5. 启动服务器
 
 首次启动会自动释放：
@@ -122,8 +124,10 @@ plugins/XingXingShop/
 /shop stock <分类> <商品id> <库存>     改库存
 /shop info <分类> <商品id>             商品详情
 /shop log [玩家名] [页码]              交易记录
+/shop log gui [页码]                   交易记录面板
 /shop report [today|yesterday|week]   全服日报
 /shop reload                          重载配置
+/shop reload force                    强制覆盖跨服商店配置
 ```
 
 ---
@@ -279,7 +283,7 @@ mvn clean package
 产物：
 
 ```text
-target/XingXingShop-1.0.6.jar
+target/XingXingShop-1.0.7.jar
 ```
 
 ---
@@ -289,3 +293,4 @@ target/XingXingShop-1.0.6.jar
 [Apache-2.0](LICENSE)
 
 如果这个插件对你有帮助，欢迎 Star ⭐
+

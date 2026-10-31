@@ -179,6 +179,15 @@ public final class ShopPlugin extends JavaPlugin {
             }, 200L, 1200L);
         }
 
+        // 自动补货：每分钟检查一次，商品自己配置补货间隔
+        Schedulers.asyncTimer(this, () -> {
+            try {
+                stocks.restockAll();
+            } catch (Throwable t) {
+                getLogger().warning("自动补货失败：" + t.getMessage());
+            }
+        }, 1200L, 1200L);
+
         // 界面每 2 秒刷新一次库存 / 余额 / 限购，跨服也能看到别的服的库存变化
         Schedulers.globalTimer(this, () -> {
             for (var player : Bukkit.getOnlinePlayers()) {
@@ -528,13 +537,17 @@ public final class ShopPlugin extends JavaPlugin {
      * 全量重载
      */
     public void reloadEverything() {
+        reloadEverything(false);
+    }
+
+    public void reloadEverything(boolean forcePush) {
         if (externalMonitor != null) externalMonitor.close();
         config.load();
         messages.reload();
         currencies.detect();
         shops.loadAll();
         if (shopSync != null) {
-            shopSync.push();
+            shopSync.push(forcePush);
         }
         stocks.load();
         limits.load();

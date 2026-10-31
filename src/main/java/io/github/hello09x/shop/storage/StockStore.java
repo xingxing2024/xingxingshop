@@ -10,6 +10,7 @@ import org.jetbrains.annotations.NotNull;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 库存与销量持久化。
@@ -22,6 +23,8 @@ public final class StockStore {
 
     private final ShopPlugin plugin;
     private final File file;
+    /** 单服模式下每个商品的下一次补货时间 */
+    private final Map<String, Long> localNextRestock = new ConcurrentHashMap<>();
 
     public StockStore(@NotNull ShopPlugin plugin) {
         this.plugin = plugin;
@@ -74,6 +77,39 @@ public final class StockStore {
         var row = db.loadStockRow(item.shopId(), item.itemId());
         if (row != null) {
             applyReservation(item, row.stock(), row.sold());
+        }
+    }
+
+    /**
+     * 自动补货。跨服用数据库时间戳去重，单服用本服时间。
+     */
+    public void restockAll() {
+        var db = plugin.transactionLog().database();
+        long now = System.currentTimeMillis();
+        for (Shop shop : plugin.shops().all().values()) {
+            for (ShopItem item : shop.items()) {
+                if (!item.hasRestock()) {
+                    continue;
+                }
+                if (db.shared()) {
+                    int after = db.restock(item.shopId(), item.itemId(), item.maxStock(),
+                            item.restockAmount(), item.restockInterval() * 1000L);
+                    if (after >= 0) {
+                        applyReservation(item, after, item.sold());
+                    }
+                } else {
+                    if (item.stock() >= item.maxStock()) {
+                        continue;
+                    }
+                    long next = localNextRestock.getOrDefault(item.key(), 0L);
+                    if (now < next) {
+                        continue;
+                    }
+                    item.stock(Math.min(item.maxStock(), item.stock() + item.restockAmount()));
+                    localNextRestock.put(item.key(), now + item.restockInterval() * 1000L);
+                    saveItem(item);
+                }
+            }
         }
     }
 

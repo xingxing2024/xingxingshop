@@ -48,11 +48,17 @@ public final class ShopItem {
     private final int sellLimit;
     /** 折扣倍率（0.8 = 八折），1 表示无折扣 */
     private final double discount;
+    /** 折扣开始时间戳，0 = 立即生效 */
+    private final long discountStart;
     /** 折扣截止时间戳，0 = 一直有效 */
     private final long discountUntil;
     /** VIP 买价，null = 不启用 */
     private final Double vipPrice;
     private final String vipPermission;
+    /** 每次自动补货数量，0 = 不补 */
+    private final int restockAmount;
+    /** 自动补货间隔（秒），0 = 不补 */
+    private final int restockInterval;
 
     private volatile int stock;
     private volatile int sold;
@@ -74,9 +80,12 @@ public final class ShopItem {
             int limit,
             int sellLimit,
             double discount,
+            long discountStart,
             long discountUntil,
             @Nullable Double vipPrice,
-            @Nullable String vipPermission
+            @Nullable String vipPermission,
+            int restockAmount,
+            int restockInterval
     ) {
         this.shopId = shopId;
         this.itemId = itemId;
@@ -96,10 +105,13 @@ public final class ShopItem {
         this.limit = limit;
         this.sellLimit = sellLimit;
         this.discount = discount <= 0 || discount > 1 ? 1 : discount;
+        this.discountStart = discountStart;
         this.discountUntil = discountUntil;
         this.vipPrice = vipPrice;
         this.vipPermission = vipPermission == null || vipPermission.isBlank()
                 ? "xshop.vip" : vipPermission;
+        this.restockAmount = Math.max(0, restockAmount);
+        this.restockInterval = Math.max(0, restockInterval);
     }
 
     // ================================================================
@@ -142,11 +154,27 @@ public final class ShopItem {
         return vipPrice == null ? 0 : vipPrice;
     }
 
+    public int restockAmount() {
+        return restockAmount;
+    }
+
+    public int restockInterval() {
+        return restockInterval;
+    }
+
+    public boolean hasRestock() {
+        return restockAmount > 0 && restockInterval > 0 && maxStock > 0;
+    }
+
     private double discountMultiplier() {
         if (discount >= 1 || discount <= 0) {
             return 1;
         }
-        if (discountUntil > 0 && System.currentTimeMillis() >= discountUntil) {
+        long now = System.currentTimeMillis();
+        if (discountStart > 0 && now < discountStart) {
+            return 1;
+        }
+        if (discountUntil > 0 && now >= discountUntil) {
             return 1;
         }
         return discount;
@@ -160,7 +188,11 @@ public final class ShopItem {
     /** 可能的最低买入价（含 VIP 价 / 折扣），用于防低买高卖 */
     public double minBuyPrice() {
         double base = vipPrice != null ? Math.min(buyPrice, vipPrice) : buyPrice;
-        return base * discountMultiplier();
+        if (discount > 0 && discount < 1
+                && (discountUntil <= 0 || System.currentTimeMillis() < discountUntil)) {
+            base *= discount;
+        }
+        return base;
     }
 
     /** 基础卖出单价（未计算动态波动和库存倍率） */

@@ -233,7 +233,8 @@ public final class TransactionDatabase {
                     quantity    INT         NOT NULL,
                     unit_price  DOUBLE      NOT NULL,
                     total       DOUBLE      NOT NULL,
-                    admin       %s          NOT NULL DEFAULT 0
+                    admin       %s          NOT NULL DEFAULT 0,
+                    external_id VARCHAR(128)
                 )
                 """.formatted(
                 table("shop_transaction"),
@@ -260,6 +261,7 @@ public final class TransactionDatabase {
                             item_id VARCHAR(64) NOT NULL,
                             stock   INT         NOT NULL,
                             sold    INT         NOT NULL,
+                            last_restock BIGINT NOT NULL DEFAULT 0,
                             PRIMARY KEY (shop_id, item_id)
                         )
                         """.formatted(table("shop_stock")));
@@ -298,6 +300,11 @@ public final class TransactionDatabase {
                             v VARCHAR(255) NOT NULL
                         )
                         """.formatted(table("shop_meta")));
+
+                // 旧库自动补列
+                ensureColumn(st, table("shop_stock"), "last_restock", "BIGINT NOT NULL DEFAULT 0");
+                ensureColumn(st, table("shop_transaction"), "external_id", "VARCHAR(128)");
+                safeUniqueIndex(st, "idx_shop_tr_external", table("shop_transaction"), "external_id");
             }
         } finally {
             closeQuietly(conn);
@@ -312,6 +319,24 @@ public final class TransactionDatabase {
         }
     }
 
+    private void safeUniqueIndex(@NotNull Statement st, @NotNull String name,
+                                 @NotNull String table, @NotNull String column) {
+        try {
+            st.execute("CREATE UNIQUE INDEX " + index(name) + " ON " + table + "(" + column + ")");
+        } catch (SQLException ignored) {
+            // 索引已存在
+        }
+    }
+
+    private void ensureColumn(@NotNull Statement st, @NotNull String table,
+                             @NotNull String column, @NotNull String definition) {
+        try {
+            st.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+        } catch (SQLException ignored) {
+            // 列已存在
+        }
+    }
+
     // ================================================================
     //  写入
     // ================================================================
@@ -322,12 +347,19 @@ public final class TransactionDatabase {
      * <p>只是丢进单线程队列马上返回，不阻塞调用方（主线程）。</p>
      */
     public void insert(@NotNull TransactionLog.Record rec) {
+        insert(rec, null);
+    }
+
+    /**
+     * 插入一条记录；externalId 非空时做幂等（重复 ID 只记一次）。
+     */
+    public void insert(@NotNull TransactionLog.Record rec, @Nullable String externalId) {
         if (!available()) {
             return;
         }
         writer.execute(() -> {
             try {
-                doInsert(rec);
+                doInsert(rec, externalId);
                 written.incrementAndGet();
             } catch (Throwable t) {
                 plugin.getLogger().warning("写入交易记录失败：" + t.getMessage());
@@ -335,13 +367,20 @@ public final class TransactionDatabase {
         });
     }
 
-    private void doInsert(@NotNull TransactionLog.Record rec) throws SQLException {
-        String sql = """
-                INSERT INTO %s
-                (time, player_name, player_uuid, shop_id, item_id, item_name,
-                 currency, buying, quantity, unit_price, total, admin)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """.formatted(table("shop_transaction"));
+    private void doInsert(@NotNull TransactionLog.Record rec, @Nullable String externalId) throws SQLException {
+        String table = table("shop_transaction");
+        String sql = externalId == null
+                ? "INSERT INTO " + table + " (time, player_name, player_uuid, shop_id, item_id, item_name,"
+                + " currency, buying, quantity, unit_price, total, admin, external_id)"
+                + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)"
+                : (type == Type.MYSQL
+                ? "INSERT INTO " + table + " (time, player_name, player_uuid, shop_id, item_id, item_name,"
+                + " currency, buying, quantity, unit_price, total, admin, external_id)"
+                + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                + " ON DUPLICATE KEY UPDATE id = id"
+                : "INSERT OR IGNORE INTO " + table + " (time, player_name, player_uuid, shop_id, item_id, item_name,"
+                + " currency, buying, quantity, unit_price, total, admin, external_id)"
+                + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         Connection conn = null;
         try {
             conn = connection();
@@ -358,8 +397,32 @@ public final class TransactionDatabase {
                 ps.setDouble(10, rec.unitPrice());
                 ps.setDouble(11, rec.total());
                 ps.setInt(12, rec.admin() ? 1 : 0);
+                if (externalId != null) {
+                    ps.setString(13, externalId);
+                }
                 ps.executeUpdate();
             }
+        } finally {
+            closeQuietly(conn);
+        }
+    }
+
+    public boolean externalExists(@NotNull String externalId) {
+        if (!available()) {
+            return false;
+        }
+        Connection conn = null;
+        try {
+            conn = connection();
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT 1 FROM " + table("shop_transaction") + " WHERE external_id = ? LIMIT 1")) {
+                ps.setString(1, externalId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next();
+                }
+            }
+        } catch (SQLException e) {
+            return false;
         } finally {
             closeQuietly(conn);
         }
@@ -945,6 +1008,60 @@ public final class TransactionDatabase {
             conn.rollback();
         } catch (SQLException ignored) {
             // 忽略
+        }
+    }
+
+    /**
+     * 跨服自动补货：同一商品在 intervalMillis 内只会补一次。
+     *
+     * @return 补货后的库存；没补返回 -1
+     */
+    public int restock(@NotNull String shopId, @NotNull String itemId, int maxStock,
+                       int amount, long intervalMillis) {
+        if (maxStock <= 0 || amount <= 0 || intervalMillis <= 0) {
+            return -1;
+        }
+        Connection conn = null;
+        try {
+            conn = connection();
+            conn.setAutoCommit(false);
+            ensureStockRow(conn, shopId, itemId, maxStock);
+            String sql = "SELECT stock, last_restock FROM " + table("shop_stock")
+                    + " WHERE shop_id = ? AND item_id = ?" + (type == Type.MYSQL ? " FOR UPDATE" : "");
+            int stock;
+            long last;
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, shopId);
+                ps.setString(2, itemId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    rs.next();
+                    stock = rs.getInt(1);
+                    last = rs.getLong(2);
+                }
+            }
+            long now = System.currentTimeMillis();
+            if (stock >= maxStock || now - last < intervalMillis) {
+                conn.rollback();
+                return -1;
+            }
+            int after = Math.min(maxStock, stock + amount);
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "UPDATE " + table("shop_stock") + " SET stock = ?, last_restock = ? "
+                            + "WHERE shop_id = ? AND item_id = ?")) {
+                ps.setInt(1, after);
+                ps.setLong(2, now);
+                ps.setString(3, shopId);
+                ps.setString(4, itemId);
+                ps.executeUpdate();
+            }
+            conn.commit();
+            return after;
+        } catch (Throwable t) {
+            rollbackQuietly(conn);
+            plugin.getLogger().warning("自动补货失败：" + t.getMessage());
+            return -1;
+        } finally {
+            closeQuietly(conn);
         }
     }
 

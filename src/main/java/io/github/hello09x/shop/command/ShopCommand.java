@@ -95,7 +95,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
                 if (!admin(sender)) {
                     return true;
                 }
-                plugin.reloadEverything();
+                plugin.reloadEverything(args.length > 1 && args[1].equalsIgnoreCase("force"));
                 plugin.messages().send(sender, "reloaded");
                 return true;
             }
@@ -191,13 +191,14 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
         if (admin) {
             out.add("  &c&l❯ 管理指令 &7（权限 &fxshop.admin&7）");
             out.add("    &f/shop list &8» &7列出所有商店与商品数量");
-            out.add("    &f/shop reload &8» &7重载配置、语言、商店文件");
+            out.add("    &f/shop reload &e[force] &8» &7重载配置、语言、商店文件");
             out.add("    &f/shop add &e<分类> <买价> [库存] &8» &7上架手持物品");
             out.add("    &f/shop remove &e<分类> <商品id> &8» &7下架商品");
             out.add("    &f/shop price &e<分类> <商品id> <价格> &8» &7修改价格");
             out.add("    &f/shop stock &e<分类> <商品id> <库存> &8» &7修改库存");
             out.add("    &f/shop info &e<分类> <商品id> &8» &7查看商品详情");
             out.add("    &f/shop log &e[玩家名] [页码] &8» &7查看交易记录");
+            out.add("    &f/shop log gui &e[页码] &8» &7打开交易记录面板");
             out.add("    &f/shop report &e[today|yesterday|week|month|日期|list] &8» &7查看全服日报");
             out.add("");
         }
@@ -403,8 +404,15 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             return;
         }
         if (args.length < 9) {
-            sender.sendMessage("用法：shop record <玩家> <来源> <buy|sell> <商品ID> <数量> <总金额> <货币ID> <商品名称>");
+            sender.sendMessage("用法：shop record <玩家> <来源> <buy|sell> <商品ID> <数量> <总金额> <货币ID> <商品名称> [id=外部ID]");
             return;
+        }
+        String externalId = null;
+        int nameEnd = args.length;
+        String last = args[args.length - 1];
+        if (args.length > 9 && last.startsWith("id=")) {
+            externalId = last.substring(3);
+            nameEnd = args.length - 1;
         }
         Player player = Bukkit.getPlayerExact(args[1]);
         if (player == null) { sender.sendMessage("外部交易登记失败：玩家不在线。"); return; }
@@ -412,15 +420,35 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage("外部交易登记失败：方向必须为 buy 或 sell。"); return;
         }
         try {
-            plugin.transactionLog().recordExternal(player, args[2], args[4],
-                    String.join(" ", java.util.Arrays.copyOfRange(args, 8, args.length)), args[7],
-                    args[3].equalsIgnoreCase("buy"), Integer.parseInt(args[5]), Double.parseDouble(args[6]));
+            boolean recorded = plugin.transactionLog().recordExternalId(player, args[2], args[4],
+                    String.join(" ", java.util.Arrays.copyOfRange(args, 8, nameEnd)), args[7],
+                    args[3].equalsIgnoreCase("buy"), Integer.parseInt(args[5]), Double.parseDouble(args[6]),
+                    externalId);
+            if (!recorded) {
+                sender.sendMessage("外部交易登记已忽略：该外部 ID 已记录过。");
+            }
         } catch (IllegalArgumentException exception) {
             sender.sendMessage("外部交易登记失败：" + exception.getMessage());
         }
     }
 
     private void log(@NotNull CommandSender sender, @NotNull String[] args) {
+        if (args.length > 1 && args[1].equalsIgnoreCase("gui")) {
+            if (!(sender instanceof Player player)) {
+                plugin.messages().send(sender, "player-only");
+                return;
+            }
+            int page = 1;
+            if (args.length > 2) {
+                try {
+                    page = Math.max(1, Integer.parseInt(args[2]));
+                } catch (NumberFormatException ignored) {
+                    // 默认第一页
+                }
+            }
+            plugin.gui().openTransactions(player, page);
+            return;
+        }
         // 解析参数：可能是页码，也可能是玩家名
         String playerName = null;
         int page = 1;

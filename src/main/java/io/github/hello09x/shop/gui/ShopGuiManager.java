@@ -43,7 +43,12 @@ public final class ShopGuiManager {
         viewer.openInventory(view.getInventory());
     }
 
-    /** 打开入口：进「购买/收购」选择页 */
+    /** 管理员交易记录面板 */
+    public void openTransactions(@NotNull Player viewer, int page) {
+        TransactionMenu menu = new TransactionMenu(plugin, viewer, page);
+        viewer.openInventory(menu.getInventory());
+    }
+
     public void openEntry(@NotNull Player viewer) {
         var shops = plugin.shops().all();
         if (shops.isEmpty()) {
@@ -93,6 +98,10 @@ public final class ShopGuiManager {
 
     public static @Nullable ConfirmView asConfirm(@Nullable InventoryHolder holder) {
         return holder instanceof ConfirmView c ? c : null;
+    }
+
+    public static @Nullable TransactionMenu asTransactions(@Nullable InventoryHolder holder) {
+        return holder instanceof TransactionMenu m ? m : null;
     }
 
 

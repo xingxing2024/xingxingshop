@@ -50,17 +50,32 @@ public final class ShopSync {
 
     /** 管理员 /shop reload 后上传本地配置 */
     public void push() {
+        push(false);
+    }
+
+    /**
+     * 上传本地配置。
+     *
+     * @param force true = 覆盖其他服刚上传的版本
+     */
+    public boolean push(boolean force) {
         if (!enabled()) {
-            return;
+            return false;
+        }
+        long remote = plugin.transactionLog().database().loadShopConfigVersion();
+        if (!force && remote > lastVersion) {
+            plugin.getLogger().warning("商店配置冲突：其他服已经更新过配置。"
+                    + "本次上传已取消，确认要覆盖请使用 /shop reload force");
+            return false;
         }
         Map<String, String> configs = read();
         if (configs.isEmpty()) {
-            return;
+            return false;
         }
-        lastVersion = Math.max(System.currentTimeMillis(),
-                plugin.transactionLog().database().loadShopConfigVersion() + 1);
+        lastVersion = Math.max(System.currentTimeMillis(), remote + 1);
         plugin.transactionLog().database().replaceShopConfigs(configs, lastVersion);
         pulled = true;
+        return true;
     }
 
     /** 轮询远程版本；有新版本就写回本地文件 */

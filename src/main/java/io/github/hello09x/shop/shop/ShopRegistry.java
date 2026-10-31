@@ -320,6 +320,7 @@ public final class ShopRegistry {
                         s.getInt("custom-model-data", 0), s.getBoolean("glow", false));
 
         double discount = sanitizeDiscount(s.getDouble("discount", 1));
+        long discountStart = parseDiscountUntil(s.getString("discount-start"));
         long discountUntil = parseDiscountUntil(s.getString("discount-until"));
         Double vipPrice = s.contains("vip-price")
                 ? sanitizePrice(s.getDouble("vip-price"), shopId, itemId, "vip-price")
@@ -339,7 +340,8 @@ public final class ShopRegistry {
                 s.getInt("limit", 0),
                 // 单卖的每日上限：-1 = 按价格自动分档，0 = 不限，>0 = 手写值
                 s.getInt("sell-limit", sell ? -1 : 0),
-                discount, discountUntil, vipPrice, vipPermission
+                discount, discountStart, discountUntil, vipPrice, vipPermission,
+                s.getInt("restock", 0), s.getInt("restock-interval", 0)
         );
     }
 
@@ -439,6 +441,7 @@ public final class ShopRegistry {
         boolean dynamic = boolOpt(opts, "dynamic", false);
         int slot = normalizeSlot(intOpt(opts, "slot", -1));
         double discount = sanitizeDiscount(doubleOpt(opts, "discount", 1));
+        long discountStart = parseDiscountUntil(opts.get("discount-start"));
         long discountUntil = parseDiscountUntil(opts.get("discount-until"));
         Double vipPrice = opts.containsKey("vip-price")
                 ? sanitizePrice(parse(opts.get("vip-price"), 0), shopId, parts[0], "vip-price")
@@ -473,7 +476,8 @@ public final class ShopRegistry {
                 slot != -1 ? slot : autoSlot,
                 opts.get("permission"),
                 stock, dynamic, limit, sellLimit,
-                discount, discountUntil, vipPrice, opts.get("vip-permission")
+                discount, discountStart, discountUntil, vipPrice, opts.get("vip-permission"),
+                intOpt(opts, "restock", 0), intOpt(opts, "restock-interval", 0)
         );
     }
 
