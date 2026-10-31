@@ -87,9 +87,12 @@ plugins/XingXingShop/
 ├── config.yml
 ├── lang.yml
 ├── shops/          # 15 个商店模板，862 件商品
+├── lib/            # 首次启动从阿里云下载的 JDBC 驱动
 ├── logs/           # 交易文本日志
 └── reports/        # 日报
 ```
+
+> 首次启动需要联网下载一次 SQLite / MySQL 驱动；之后复用 `lib/` 里的文件。离线服务器可以手动把驱动放进 `plugins/XingXingShop/lib/`，或在 `config.yml` 关闭 `database.driver-download`。
 
 ---
 
