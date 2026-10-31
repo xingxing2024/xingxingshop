@@ -25,6 +25,10 @@ public final class ShopGuiManager {
             plugin.messages().send(viewer, "shop-closed");
             return;
         }
+        if (shop.permission() != null && !viewer.hasPermission(shop.permission())) {
+            plugin.messages().send(viewer, "no-permission");
+            return;
+        }
         io.github.hello09x.shop.util.Sounds.play(viewer, "open");
         ShopView view = new ShopView(plugin, shop, viewer);
         viewer.openInventory(view.getInventory());
@@ -33,6 +37,10 @@ public final class ShopGuiManager {
     public void open(@NotNull Player viewer, @NotNull Shop shop, int page) {
         if (!shop.isOpen()) {
             plugin.messages().send(viewer, "shop-closed");
+            return;
+        }
+        if (shop.permission() != null && !viewer.hasPermission(shop.permission())) {
+            plugin.messages().send(viewer, "no-permission");
             return;
         }
         io.github.hello09x.shop.util.Sounds.play(viewer, "open");
@@ -48,7 +56,6 @@ public final class ShopGuiManager {
      */
     public void openConfirm(@NotNull Player viewer, @NotNull Shop shop, @NotNull ShopItem item,
                             int quantity, boolean selling) {
-        plugin.stocks().refreshItem(item);
         ConfirmView view = new ConfirmView(plugin, shop, item, viewer, quantity, selling);
         viewer.openInventory(view.getInventory());
     }

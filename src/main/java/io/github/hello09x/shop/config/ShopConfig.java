@@ -295,22 +295,6 @@ public final class ShopConfig {
         return dynamicSteps;
     }
 
-    public int rows() {
-        return plugin.getConfig().getInt("gui.rows", 6);
-    }
-
-    public int size() {
-        return rows() * 9;
-    }
-
-    public String title() {
-        return plugin.getConfig().getString("gui.buy-title", "&8购买 &7» &a{shop}");
-    }
-
-    public String sellTitle() {
-        return plugin.getConfig().getString("gui.sell-title", "&8收购 &7» &a{shop}");
-    }
-
     // ---------------------------------------------------------------- 音效
 
     public boolean soundEnabled() {

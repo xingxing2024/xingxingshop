@@ -33,6 +33,7 @@ public final class TransactionService {
         LIMIT_REACHED,
         SELL_LIMIT_REACHED,
         NO_CURRENCY,
+        DB_UNAVAILABLE,
         ERROR
     }
 
@@ -93,9 +94,10 @@ public final class TransactionService {
         }
 
         boolean shared = plugin.transactionLog().database().shared();
-        if (shared) {
-            // 下单前用数据库最新库存算价，避免跨服 5 秒缓存导致价格不一致
-            plugin.stocks().refreshItem(item);
+        var db = plugin.transactionLog().database();
+        if (db.mysqlConfigured() && !db.available()) {
+            callback.accept(new Outcome(Result.DB_UNAVAILABLE, 0, name(item)));
+            return;
         }
 
         // 每日限购
@@ -167,7 +169,6 @@ public final class TransactionService {
         final int wanted = quantity;
         final double unitPrice = unit;
         final double paid = total;
-        var db = plugin.transactionLog().database();
         var uuid = player.getUniqueId().toString();
         var day = java.time.LocalDate.now().toString();
         var limit = item.isLimited() ? item.limit() : 0;
@@ -255,8 +256,10 @@ public final class TransactionService {
         }
 
         boolean shared = plugin.transactionLog().database().shared();
-        if (shared) {
-            plugin.stocks().refreshItem(item);
+        var db = plugin.transactionLog().database();
+        if (db.mysqlConfigured() && !db.available()) {
+            callback.accept(new Outcome(Result.DB_UNAVAILABLE, 0, name(item)));
+            return;
         }
 
         // 每日限卖（按价格自动分档）
@@ -316,7 +319,6 @@ public final class TransactionService {
         final int wanted = quantity;
         final double unitPrice = unit;
         final double paid = total;
-        var db = plugin.transactionLog().database();
         var uuid = player.getUniqueId().toString();
         var day = java.time.LocalDate.now().toString();
         var sellLimit = item.isSellLimited() ? item.sellLimit() : 0;
@@ -405,6 +407,9 @@ public final class TransactionService {
     // ================================================================
 
     private boolean allowed(@NotNull Player player, @NotNull Shop shop, @NotNull ShopItem item) {
+        if (!shop.isOpen()) {
+            return false;
+        }
         if (!player.hasPermission("xshop.use")) {
             return false;
         }
@@ -424,7 +429,13 @@ public final class TransactionService {
         int remaining = quantity;
         while (remaining > 0) {
             int batch = Math.min(remaining, item.maxStackSize());
-            giveRaw(player, item.reward(batch));
+            ItemStack stack = item.reward(batch);
+            if (player.isOnline()) {
+                giveRaw(player, stack);
+            } else {
+                // 玩家在异步交易期间退出：先进待领取，上线补发
+                plugin.pendingDelivery().add(player.getUniqueId(), stack);
+            }
             remaining -= batch;
         }
     }
@@ -510,6 +521,10 @@ public final class TransactionService {
             }
             case NO_CURRENCY -> {
                 msg.send(player, "no-currency");
+                io.github.hello09x.shop.util.Sounds.play(player, "error");
+            }
+            case DB_UNAVAILABLE -> {
+                msg.send(player, "database-unavailable");
                 io.github.hello09x.shop.util.Sounds.play(player, "error");
             }
             case NOT_ENOUGH_MONEY -> {

@@ -38,7 +38,7 @@ public final class TransactionMenu implements InventoryHolder {
         this.viewer = viewer;
         this.page = Math.max(1, page);
         this.inventory = Bukkit.createInventory(this, 54,
-                Text.color("&8交易记录 &7» &f第 " + this.page + " 页"));
+                Text.color("&8交易记录"));
         render();
     }
 

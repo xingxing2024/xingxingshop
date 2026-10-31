@@ -157,12 +157,15 @@ public final class StockStore {
     /**
      * 新的一天：提醒收藏里有限购 / 限卖的商品额度已刷新。
      * 每天每人只提醒一次，跨天上线也会补发。
-     */
-    public void notifyDailyLimitRefresh(@NotNull Player player) {
+     */    public void notifyDailyLimitRefresh(@NotNull Player player) {
         var uuid = player.getUniqueId();
         LocalDate today = LocalDate.now();
         if (today.equals(limitNoticeDay.get(uuid))) {
             return;
+        }
+        // 只保留今天的记录，避免长期运行后 map 膨胀
+        if (limitNoticeDay.size() > 200) {
+            limitNoticeDay.entrySet().removeIf(e -> !today.equals(e.getValue()));
         }
 
         Schedulers.entity(plugin, player, () -> {
@@ -194,11 +197,6 @@ public final class StockStore {
             player.sendMessage(Text.color("&a[商店] &7新的一天，收藏的 &f"
                     + String.join("、", names) + " &7限购 / 限卖额度已刷新"));
         });
-    }
-
-    /** 玩家下线后清掉提醒记录，避免长期占用内存 */
-    public void forgetDailyNotice(@NotNull Player player) {
-        limitNoticeDay.remove(player.getUniqueId());
     }
 
     private void applyRows(@NotNull java.util.List<TransactionDatabase.StockRow> rows) {        Map<String, ShopItem> byKey = buildIndex();

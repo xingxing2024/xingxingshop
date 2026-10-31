@@ -42,7 +42,9 @@ public final class FavoriteMenu implements InventoryHolder {
             if (split <= 0) continue;
             Shop shop = plugin.shops().get(key.substring(0, split));
             ShopItem item = shop == null ? null : shop.find(key.substring(split + 1));
-            if (shop != null && item != null && shop.isOpen()) {
+            if (shop != null && item != null && shop.isOpen()
+                    && (shop.permission() == null || viewer.hasPermission(shop.permission()))
+                    && (item.permission() == null || viewer.hasPermission(item.permission()))) {
                 hits.add(new Hit(shop, item));
             }
         }

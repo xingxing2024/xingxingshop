@@ -23,6 +23,7 @@ shop-closed: '&c这个活动商店还没开放或已经结束'
 shop-not-found: '&c找不到商店 &f{0}'
 hand-empty: '&c请手持一个物品再执行'
 no-currency: '&c该商品使用的货币当前不可用'
+database-unavailable: '&c数据库未连接，暂时无法交易，请稍后再试'
 failed: '&c操作失败，请稍后再试'
 reloaded: '&a配置和商店已重新加载'
 

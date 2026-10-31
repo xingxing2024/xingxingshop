@@ -6,7 +6,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -21,8 +20,7 @@ public final class PlayerJoinListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onJoin(@NotNull PlayerJoinEvent event) {
-        var player = event.getPlayer();
+    public void onJoin(@NotNull PlayerJoinEvent event) {        var player = event.getPlayer();
         // 延后 2 秒，等玩家完全进服再发，避免被登录消息刷掉
         Schedulers.entityLater(plugin, player, () -> {
             if (!player.isOnline()) {
@@ -38,12 +36,12 @@ public final class PlayerJoinListener implements Listener {
             } catch (Throwable t) {
                 plugin.getLogger().warning("提醒限购刷新失败：" + t.getMessage());
             }
+            try {
+                plugin.pendingDelivery().deliver(player);
+            } catch (Throwable t) {
+                plugin.getLogger().warning("补发离线商品失败：" + t.getMessage());
+            }
         }, 40L);
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onQuit(@NotNull PlayerQuitEvent event) {
-        plugin.stocks().forgetDailyNotice(event.getPlayer());
     }
 
 }

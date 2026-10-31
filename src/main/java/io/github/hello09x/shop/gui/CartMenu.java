@@ -41,13 +41,22 @@ public final class CartMenu implements InventoryHolder {
 
     private void collect() {
         lines.clear();
+        List<String> stale = new ArrayList<>();
         for (var entry : plugin.cart().items(viewer.getUniqueId()).entrySet()) {
             int split = entry.getKey().indexOf(':');
             Shop shop = split > 0 ? plugin.shops().get(entry.getKey().substring(0, split)) : null;
             ShopItem item = shop == null ? null : shop.find(entry.getKey().substring(split + 1));
             if (item != null && shop.isOpen()) {
                 lines.add(new Line(shop, item, entry.getValue()));
+            } else {
+                stale.add(entry.getKey());
             }
+        }
+        if (!stale.isEmpty()) {
+            for (String key : stale) {
+                plugin.cart().remove(viewer.getUniqueId(), key);
+            }
+            viewer.sendMessage(Text.color("&7已从购物车移除 &f" + stale.size() + " &7件已下架商品"));
         }
     }
 

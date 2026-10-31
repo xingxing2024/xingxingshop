@@ -15,8 +15,10 @@ import io.github.hello09x.shop.log.TransactionLog;
 import io.github.hello09x.shop.shop.ShopRegistry;
 import io.github.hello09x.shop.storage.CartStore;
 import io.github.hello09x.shop.storage.FavoriteStore;
+import io.github.hello09x.shop.storage.PendingDeliveryStore;
 import io.github.hello09x.shop.storage.ShopSync;
-import io.github.hello09x.shop.storage.StockStore;import io.github.hello09x.shop.util.Messages;
+import io.github.hello09x.shop.storage.StockStore;
+import io.github.hello09x.shop.util.Messages;
 import io.github.hello09x.shop.util.Schedulers;
 import org.bukkit.Bukkit;
 import org.bukkit.command.PluginCommand;
@@ -45,6 +47,7 @@ public final class ShopPlugin extends JavaPlugin {
     private StockStore stocks;
     private LimitStore limits;
     private FavoriteStore favorites;
+    private PendingDeliveryStore pendingDelivery;
     private ShopSync shopSync;
     private final CartStore cart = new CartStore();
     private ShopGuiManager gui;
@@ -116,6 +119,8 @@ public final class ShopPlugin extends JavaPlugin {
         this.limits.load();
         this.favorites = new FavoriteStore(this);
         this.favorites.load();
+        this.pendingDelivery = new PendingDeliveryStore(this);
+        this.pendingDelivery.load();
 
         // GUI
         this.gui = new ShopGuiManager(this);
@@ -164,7 +169,7 @@ public final class ShopPlugin extends JavaPlugin {
         }, period, period);
 
         // 跨服：定时从数据库刷新内存缓存，保证别的服的买卖能及时显示
-        if (transactionLog.database().shared()) {
+        if (transactionLog.database().mysqlConfigured()) {
             Schedulers.asyncTimer(this, () -> {
                 try {
                     stocks.refresh();
@@ -309,18 +314,19 @@ public final class ShopPlugin extends JavaPlugin {
                 }
                 continue;
             }
-            // 商店模板：jar 里的版本更新时自动替换本地旧版（先备份 .bak）
+            // 商店模板：jar 里的版本更新时只补新增键，不覆盖管理员改过的内容
             if (path.startsWith("shops/")) {
                 int bundled = templateVersion(readResourceText(path));
                 int local = templateVersion(readFileText(target));
                 if (bundled > local) {
                     backup(target);
                     try {
-                        saveResource(path, true);
+                        var merged = merger.merge(path);
                         updated++;
-                        getLogger().info("已更新商店模板 " + path
+                        getLogger().info("已合并商店模板 " + path
                                 + "（v" + local + " → v" + bundled
-                                + "，旧文件备份为 " + target.getName() + ".bak）");
+                                + "，新增 " + Math.max(0, merged.added()) + " 项，旧文件备份为 "
+                                + target.getName() + ".bak）");
                     } catch (Throwable t) {
                         getLogger().warning("更新 " + path + " 失败：" + t.getMessage());
                     }
@@ -468,12 +474,20 @@ public final class ShopPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         disabling = true;
-        drainTrades();
         tradeExecutor.shutdown();
+        try {
+            tradeExecutor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        drainTrades();
 
         if (externalMonitor != null) externalMonitor.close();
         if (stocks != null) {
             stocks.save();
+        }
+        if (pendingDelivery != null) {
+            pendingDelivery.save();
         }
         if (limits != null) {
             limits.save();
@@ -583,6 +597,10 @@ public final class ShopPlugin extends JavaPlugin {
 
     public StockStore stocks() {
         return stocks;
+    }
+
+    public PendingDeliveryStore pendingDelivery() {
+        return pendingDelivery;
     }
 
     public LimitStore limits() {

@@ -84,7 +84,9 @@ public final class ShopView implements InventoryHolder {
         inventory.clear();
         slotItems.clear();
 
-        List<ShopItem> items = shop.sortedItems();
+        List<ShopItem> items = shop.sortedItems().stream()
+                .filter(item -> item.permission() == null || viewer.hasPermission(item.permission()))
+                .toList();
         this.totalPages = Math.max(1, (items.size() + ITEM_AREA - 1) / ITEM_AREA);
         this.page = Math.max(1, Math.min(page, totalPages));
 

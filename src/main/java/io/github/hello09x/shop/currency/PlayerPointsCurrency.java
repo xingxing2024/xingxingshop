@@ -81,7 +81,7 @@ public final class PlayerPointsCurrency implements Currency {
         if (api == null) {
             return false;
         }
-        int cost = (int) Math.ceil(amount);
+        int cost = Math.max(1, (int) Math.round(amount));
         try {
             Object result = api.getClass()
                     .getMethod("take", UUID.class, int.class)
@@ -97,10 +97,7 @@ public final class PlayerPointsCurrency implements Currency {
         if (api == null) {
             return false;
         }
-        int gain = (int) Math.floor(amount);
-        if (gain <= 0) {
-            return true;
-        }
+        int gain = Math.max(1, (int) Math.round(amount));
         try {
             Object result = api.getClass()
                     .getMethod("give", UUID.class, int.class)

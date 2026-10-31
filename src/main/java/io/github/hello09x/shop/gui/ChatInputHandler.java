@@ -12,6 +12,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -80,6 +81,11 @@ public final class ChatInputHandler implements Listener {
      */
     public void cancel(@NotNull Player viewer) {
         pending.remove(viewer.getUniqueId());
+    }
+
+    @EventHandler
+    public void onQuit(@NotNull PlayerQuitEvent event) {
+        pending.remove(event.getPlayer().getUniqueId());
     }
 
     public boolean isWaiting(@NotNull Player viewer) {

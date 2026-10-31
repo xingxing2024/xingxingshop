@@ -86,6 +86,11 @@ public final class TransactionDatabase {
         return available && type != Type.NONE;
     }
 
+    /** 配置的是 MySQL（不管当前连没连上） */
+    public boolean mysqlConfigured() {
+        return type == Type.MYSQL;
+    }
+
     /**
      * 是否多服共享同一个数据库。
      *
