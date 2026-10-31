@@ -59,13 +59,16 @@ public final class GuiListener implements Listener {
             return;
         }
 
-        long now = System.currentTimeMillis();
-        Long last = lastClick.put(event.getWhoClicked().getUniqueId(), now);
-        if (last != null && now - last < CLICK_COOLDOWN_MS) {
-            return;
-        }
-        if (lastClick.size() > 200) {
-            lastClick.entrySet().removeIf(e -> now - e.getValue() > 10_000L);
+        // 确认界面的「确认 / 取消」有自己的防重复锁，不能再被连点冷却挡住
+        if (confirm == null) {
+            long now = System.currentTimeMillis();
+            Long last = lastClick.put(event.getWhoClicked().getUniqueId(), now);
+            if (last != null && now - last < CLICK_COOLDOWN_MS) {
+                return;
+            }
+            if (lastClick.size() > 200) {
+                lastClick.entrySet().removeIf(e -> now - e.getValue() > 10_000L);
+            }
         }
 
         int raw = event.getRawSlot();

@@ -482,6 +482,11 @@ public final class ShopView implements InventoryHolder {
     }
 
     private void addToCart(@NotNull ShopItem item) {
+        if (item.isLimitedStock() && item.stock() <= 0) {
+            io.github.hello09x.shop.util.Sounds.play(viewer, "out-of-stock");
+            viewer.sendMessage(Text.color("&c[商店] &f" + item.displayName() + " &c已售罄"));
+            return;
+        }
         var uuid = viewer.getUniqueId();
         plugin.cart().add(uuid, item.key(), 1);
         int now = plugin.cart().items(uuid).getOrDefault(item.key(), 0);
