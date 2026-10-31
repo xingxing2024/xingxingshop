@@ -67,24 +67,13 @@ public final class ShopListMenu implements InventoryHolder {
 
     private void renderFrame() {
         boolean selling = type == Shop.Type.SELL;
-        ItemStack edge = pane(Material.BLACK_STAINED_GLASS_PANE);
-        ItemStack accent = pane(selling ? Material.ORANGE_STAINED_GLASS_PANE : Material.LIME_STAINED_GLASS_PANE);
-        for (int i = 0; i < 9; i++) {
-            inventory.setItem(i, edge);
-            inventory.setItem(45 + i, edge);
-        }
-        for (int row = 1; row <= 4; row++) {
-            inventory.setItem(row * 9, edge);
-            inventory.setItem(row * 9 + 8, edge);
-        }
-        inventory.setItem(0, accent);
-        inventory.setItem(8, accent);
-        inventory.setItem(45, accent);
-        inventory.setItem(53, accent);
+        GuiStyle.frame(inventory, selling
+                ? Material.ORANGE_STAINED_GLASS_PANE
+                : Material.LIME_STAINED_GLASS_PANE);
 
         inventory.setItem(4, icon(selling ? Material.HOPPER : Material.EMERALD,
                 selling ? "&6&l收购分类" : "&a&l购买分类",
-                "",
+                "&8" + "▬".repeat(10),
                 "&7共 &f" + visible().size() + " &7个分类",
                 "&7点击卡片进入"));
     }
@@ -141,7 +130,8 @@ public final class ShopListMenu implements InventoryHolder {
         }
         lore.add("");
 
-        lore.add(Text.color("&8&m     &r &7商品预览 &8&m     "));
+        lore.add(Text.color(GuiStyle.SEP));
+        lore.add(Text.color("&7商品预览"));
         List<ShopItem> items = shop.sortedItems();
         int preview = Math.min(4, items.size());
         for (int i = 0; i < preview; i++) {
@@ -166,7 +156,7 @@ public final class ShopListMenu implements InventoryHolder {
                     + " &7~ &f" + (currency == null ? fmt(max) : currency.format(max))));
         }
 
-        lore.add("");
+        lore.add(Text.color(GuiStyle.SEP));
         lore.add(Text.color(selling ? "&6➤ 点击进入收购" : "&a➤ 点击进入购买"));
 
         meta.setLore(lore);

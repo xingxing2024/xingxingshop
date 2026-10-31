@@ -69,6 +69,7 @@ public final class ShopGuiManager {
     }
 
     public void openFavorites(@NotNull Player viewer) {
+        io.github.hello09x.shop.util.Sounds.play(viewer, "open");
         FavoriteMenu menu = new FavoriteMenu(plugin, viewer);
         viewer.openInventory(menu.getInventory());
     }

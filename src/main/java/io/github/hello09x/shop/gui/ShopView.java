@@ -88,7 +88,12 @@ public final class ShopView implements InventoryHolder {
         this.totalPages = Math.max(1, (items.size() + ITEM_AREA - 1) / ITEM_AREA);
         this.page = Math.max(1, Math.min(page, totalPages));
 
-        renderFrame();
+        Material accent = shop.type() == Shop.Type.SELL
+                ? Material.ORANGE_STAINED_GLASS_PANE
+                : Material.LIME_STAINED_GLASS_PANE;
+        GuiStyle.fill(inventory, ITEM_START, CONTROL);
+        GuiStyle.frame(inventory, accent);
+
         renderItemGrid(items);
         renderHeader();
         renderControlBar();
@@ -107,17 +112,6 @@ public final class ShopView implements InventoryHolder {
         renderControlBar();
     }
 
-    private void renderFrame() {
-        ItemStack outer = pane(shop.type() == Shop.Type.SELL
-                ? Material.ORANGE_STAINED_GLASS_PANE
-                : Material.LIME_STAINED_GLASS_PANE);
-
-        for (int row = 1; row <= 4; row++) {
-            inventory.setItem(row * 9, outer);
-            inventory.setItem(row * 9 + 8, outer);
-        }
-    }
-
     private void renderItemGrid(@NotNull List<ShopItem> items) {
         int from = (page - 1) * ITEM_AREA;
         int to = Math.min(items.size(), from + ITEM_AREA);
@@ -128,23 +122,10 @@ public final class ShopView implements InventoryHolder {
             slotItems.put(slot, item);
             inventory.setItem(slot, icon(item));
         }
-
-        int used = to - from;
-        if (used > 0 && used % 9 != 0) {
-            int rowEnd = ITEM_START + ((used / 9) + 1) * 9;
-            ItemStack empty = pane(Material.LIGHT_GRAY_STAINED_GLASS_PANE);
-            for (int slot = ITEM_START + used; slot < rowEnd; slot++) {
-                inventory.setItem(slot, empty);
-            }
-        }
     }
 
     private void renderHeader() {
         boolean selling = shop.type() == Shop.Type.SELL;
-        ItemStack edge = pane(Material.BLACK_STAINED_GLASS_PANE);
-        for (int i = 0; i < 9; i++) {
-            inventory.setItem(i, edge);
-        }
 
         // 0：返回同类的分类列表
         inventory.setItem(0, button(Material.COMPASS,
@@ -186,6 +167,7 @@ public final class ShopView implements InventoryHolder {
         }
         inventory.setItem(CONTROL + 4, button(Material.PAPER,
                 "&f第 &a" + page + " &f/ &a" + totalPages + " &f页",
+                "&a" + GuiStyle.pageBar(page, totalPages) + " &7翻页",
                 "&7共 &f" + shop.items().size() + " &7件商品"));
         if (page < totalPages) {
             inventory.setItem(CONTROL + 5, button(Material.ARROW,
@@ -233,7 +215,7 @@ public final class ShopView implements InventoryHolder {
         List<String> lore = new ArrayList<>();
         if (meta.hasLore() && meta.getLore() != null) {
             lore.addAll(meta.getLore());
-            lore.add("");
+            lore.add(Text.color(GuiStyle.SEP));
         }
 
         double unit = selling ? item.sellPrice(viewer) : item.buyPrice(viewer);
@@ -241,12 +223,14 @@ public final class ShopView implements InventoryHolder {
 
         lore.add(Text.color("&7单价 &f" + price + " &8/ 个"));
         if (item.hasDiscount()) {
-            lore.add(Text.color("&a限时折扣中"));
+            double base = selling ? item.baseSellPrice() : item.baseBuyPrice();
+            String old = currency == null ? Currency.formatNumber(base) : currency.format(base);
+            lore.add(Text.color("&7原价 &8&m" + old + "&r &a限时折扣中"));
         }
         if (item.isVipPlayer(viewer)) {
             lore.add(Text.color("&6VIP 专享价"));
         }
-        lore.add("");
+        lore.add(Text.color(GuiStyle.SEP));
 
         if (selling) {
             // 收购：显示 1 个 / 手上全部 能拿多少
@@ -275,8 +259,10 @@ public final class ShopView implements InventoryHolder {
 
         if (item.isLimitedStock()) {
             int stock = item.stock();
-            String c = stock <= 0 ? "&c" : stock < 10 ? "&e" : "&a";
-            lore.add(Text.color("&7库存 " + c + stock));
+            int max = Math.max(1, item.maxStock());
+            String c = stock <= 0 ? "&c" : stock <= max / 4 ? "&e" : "&a";
+            lore.add(Text.color("&7库存 " + c + GuiStyle.bar(stock, max, 10)
+                    + " &f" + stock + "&7/&f" + item.maxStock()));
         }
         if (item.hasRestock() && item.stock() < item.maxStock()) {
             long left = item.nextRestockAt() - System.currentTimeMillis();
@@ -309,7 +295,7 @@ public final class ShopView implements InventoryHolder {
                     : Text.color("&7今日可卖 &f" + left + " &7个"));
         }
 
-        lore.add("");
+        lore.add(Text.color(GuiStyle.SEP));
         lore.add(Text.color("&e左键 &7" + (selling ? "卖 1 个" : "买 1 个")));
         if (selling) {
             lore.add(Text.color("&e右键 &7全部卖出"));
@@ -355,16 +341,6 @@ public final class ShopView implements InventoryHolder {
             }
             lore.add(Text.color("&7商品 &f" + shop.items().size() + " &7件"));
             meta.setLore(lore);
-            stack.setItemMeta(meta);
-        }
-        return stack;
-    }
-
-    private static @NotNull ItemStack pane(@NotNull Material material) {
-        ItemStack stack = new ItemStack(material);
-        ItemMeta meta = stack.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(" ");
             stack.setItemMeta(meta);
         }
         return stack;

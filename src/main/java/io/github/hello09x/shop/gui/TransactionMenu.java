@@ -23,7 +23,8 @@ import java.util.List;
 /** 管理员交易记录面板。 */
 public final class TransactionMenu implements InventoryHolder {
 
-    private static final int PAGE_SIZE = 45;
+    private static final int PAGE_SIZE = 36;
+    private static final int ITEM_START = 9;
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("MM-dd HH:mm:ss");
 
     private final ShopPlugin plugin;
@@ -42,15 +43,20 @@ public final class TransactionMenu implements InventoryHolder {
 
     public void render() {
         inventory.clear();
+        GuiStyle.fill(inventory, ITEM_START, ITEM_START + PAGE_SIZE);
+        GuiStyle.frame(inventory, Material.CYAN_STAINED_GLASS_PANE);
         List<TransactionLog.Record> records = plugin.transactionLog().query(null, page, PAGE_SIZE);
         for (int i = 0; i < records.size(); i++) {
-            inventory.setItem(i, icon(records.get(i)));
+            inventory.setItem(ITEM_START + i, icon(records.get(i)));
         }
         int total = plugin.transactionLog().count(null);
         int pages = Math.max(1, (total + PAGE_SIZE - 1) / PAGE_SIZE);
         if (page > pages) {
             page = pages;
         }
+        inventory.setItem(4, button(Material.WRITABLE_BOOK,
+                "&b&l交易记录",
+                "&7共 &f" + total + " &7条"));
 
         if (page > 1) {
             inventory.setItem(45, button(Material.ARROW, "&e« 上一页", "&7第 " + (page - 1) + " 页"));

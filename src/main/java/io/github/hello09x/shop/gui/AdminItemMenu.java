@@ -38,6 +38,8 @@ public final class AdminItemMenu implements InventoryHolder {
 
     public void render() {
         inventory.clear();
+        GuiStyle.fill(inventory, 9, 45);
+        GuiStyle.frame(inventory, Material.CYAN_STAINED_GLASS_PANE);
         ItemStack icon = item.display();
         ItemMeta meta = icon.getItemMeta();
         if (meta != null) {
@@ -51,7 +53,7 @@ public final class AdminItemMenu implements InventoryHolder {
             ));
             icon.setItemMeta(meta);
         }
-        inventory.setItem(13, icon);
+        inventory.setItem(13, GuiStyle.glow(icon));
 
         inventory.setItem(20, button(Material.RED_CONCRETE, "&c价格 -10"));
         inventory.setItem(21, button(Material.RED_STAINED_GLASS_PANE, "&c价格 -1"));

@@ -29,6 +29,7 @@ import java.util.List;
 public final class MainMenu implements InventoryHolder {
 
     private static final int BUY_SLOT = 20;
+    private static final int FAVORITE_SLOT = 22;
     private static final int SELL_SLOT = 24;
     private static final int BALANCE_SLOT = 49;
     private static final int HELP_SLOT = 50;
@@ -49,69 +50,68 @@ public final class MainMenu implements InventoryHolder {
     public void render() {
         inventory.clear();
 
-        // 边框
-        ItemStack edge = pane(Material.BLACK_STAINED_GLASS_PANE);
-        ItemStack accent = pane(Material.CYAN_STAINED_GLASS_PANE);
-        for (int i = 0; i < 9; i++) {
-            inventory.setItem(i, edge);
-            inventory.setItem(45 + i, edge);
-        }
-        for (int row = 1; row <= 4; row++) {
-            inventory.setItem(row * 9, edge);
-            inventory.setItem(row * 9 + 8, edge);
-        }
-        inventory.setItem(0, accent);
-        inventory.setItem(8, accent);
-        inventory.setItem(45, accent);
-        inventory.setItem(53, accent);
+        // 渐变边框 + 深色底
+        GuiStyle.fill(inventory, 9, 45);
+        GuiStyle.frame(inventory, Material.CYAN_STAINED_GLASS_PANE);
 
         // 标题
-        inventory.setItem(4, icon(Material.NETHER_STAR,
+        inventory.setItem(4, GuiStyle.glow(icon(Material.NETHER_STAR,
                 "&b&l✦ &f&l商店 &b&l✦",
                 "",
                 "&7欢迎，&f" + viewer.getName(),
-                "&7请选择要进入的商店"));
+                "&7请选择要进入的商店")));
 
         // 购买入口
         List<Shop> buys = visible(Shop.Type.BUY);
-        inventory.setItem(BUY_SLOT, bigButton(Material.EMERALD,
+        inventory.setItem(BUY_SLOT, GuiStyle.glow(bigButton(Material.EMERALD,
                 "&a&l购买商店",
                 "&7用钱买物资、建材、装备……",
+                "&8" + "▬".repeat(10),
+                "&7分类 &f" + buys.size() + " &7个",
                 "",
-                "&7共 &f" + buys.size() + " &7个分类",
-                "",
-                "&a➤ 点击进入购买分类列表"));
+                "&a➤ 点击进入")));
 
         // 收购入口
         List<Shop> sells = visible(Shop.Type.SELL);
-        inventory.setItem(SELL_SLOT, bigButton(Material.HOPPER,
+        inventory.setItem(SELL_SLOT, GuiStyle.glow(bigButton(Material.HOPPER,
                 "&6&l收购商店",
                 "&7把多余的材料卖成钱",
+                "&8" + "▬".repeat(10),
+                "&7分类 &f" + sells.size() + " &7个",
                 "",
-                "&7共 &f" + sells.size() + " &7个分类",
+                "&6➤ 点击进入")));
+
+        // 收藏夹
+        int favorites = plugin.favorites().list(viewer.getUniqueId()).size();
+        inventory.setItem(FAVORITE_SLOT, icon(Material.HEART_OF_THE_SEA,
+                "&d&l❤ 我的收藏",
+                "&8" + "▬".repeat(10),
+                favorites == 0 ? "&7还没有收藏任何商品" : "&7已收藏 &f" + favorites + " &7件",
                 "",
-                "&6➤ 点击进入收购分类列表"));
+                favorites == 0
+                        ? "&8在商店里用 /shop fav add 添加"
+                        : "&d➤ 点击查看"));
 
         // 余额
         var currency = plugin.currencies().getOrDefault(null);
         if (currency != null) {
             inventory.setItem(BALANCE_SLOT, icon(Material.GOLD_INGOT,
                     "&6&l余额",
-                    "",
+                    "&8" + "▬".repeat(10),
                     "&7" + currency.displayName() + " &f" + currency.format(currency.balance(viewer)),
                     "",
                     "&8点击刷新"));
         } else {
             inventory.setItem(BALANCE_SLOT, icon(Material.BARRIER,
                     "&c&l无可用货币",
-                    "",
+                    "&8" + "▬".repeat(10),
                     "&7请安装 &fVault &7+ 经济插件"));
         }
 
         // 操作说明（与真实行为一致）
         inventory.setItem(HELP_SLOT, icon(Material.KNOWLEDGE_BOOK,
                 "&e&l操作说明",
-                "",
+                "&8" + "▬".repeat(10),
                 "&f左键 &7» 买/卖 &f1 个",
                 "&f右键 &7» 购买=买 &f1 组(64)&7，收购=&f全部卖出",
                 "&fShift+左键 &7» 聊天框输入数量",
@@ -133,6 +133,7 @@ public final class MainMenu implements InventoryHolder {
     public void onClick(int slot) {
         switch (slot) {
             case BUY_SLOT -> plugin.gui().openList(viewer, Shop.Type.BUY);
+            case FAVORITE_SLOT -> plugin.gui().openFavorites(viewer);
             case SELL_SLOT -> plugin.gui().openList(viewer, Shop.Type.SELL);
             case BALANCE_SLOT, HELP_SLOT -> render();
             case CLOSE_SLOT -> viewer.closeInventory();

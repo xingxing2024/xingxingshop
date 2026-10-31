@@ -20,7 +20,8 @@ import java.util.List;
 /** 搜索结果界面。 */
 public final class SearchMenu implements InventoryHolder {
 
-    private static final int PAGE_SIZE = 45;
+    private static final int PAGE_SIZE = 36;
+    private static final int ITEM_START = 9;
     private final ShopPlugin plugin;
     private final Player viewer;
     private final String keyword;
@@ -60,17 +61,24 @@ public final class SearchMenu implements InventoryHolder {
 
     public void render() {
         inventory.clear();
+        GuiStyle.fill(inventory, ITEM_START, ITEM_START + PAGE_SIZE);
+        GuiStyle.frame(inventory, Material.CYAN_STAINED_GLASS_PANE);
+        inventory.setItem(4, button(Material.COMPASS,
+                "&b&l搜索 &f" + keyword,
+                "&8" + "▬".repeat(10),
+                "&7找到 &f" + hits.size() + " &7个商品"));
         int pages = Math.max(1, (hits.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         page = Math.max(1, Math.min(page, pages));
         int from = (page - 1) * PAGE_SIZE;
         int to = Math.min(hits.size(), from + PAGE_SIZE);
         for (int i = from; i < to; i++) {
             Hit hit = hits.get(i);
-            inventory.setItem(i - from, icon(hit));
+            inventory.setItem(ITEM_START + i - from, icon(hit));
         }
         if (page > 1) inventory.setItem(45, button(Material.ARROW, "&e« 上一页"));
         inventory.setItem(49, button(Material.PAPER,
                 "&f第 &a" + page + " &f/ &a" + pages + " &f页",
+                "&a" + GuiStyle.pageBar(page, pages) + " &7翻页",
                 "&7共 &f" + hits.size() + " &7个结果"));
         if (page < pages) inventory.setItem(53, button(Material.ARROW, "&e下一页 »"));
         inventory.setItem(48, button(Material.BARRIER, "&c关闭"));
@@ -102,8 +110,8 @@ public final class SearchMenu implements InventoryHolder {
             render();
         } else if (slot == 48) {
             viewer.closeInventory();
-        } else if (slot >= 0 && slot < PAGE_SIZE) {
-            int index = (page - 1) * PAGE_SIZE + slot;
+        } else if (slot >= ITEM_START && slot < ITEM_START + PAGE_SIZE) {
+            int index = (page - 1) * PAGE_SIZE + (slot - ITEM_START);
             if (index < hits.size()) {
                 plugin.gui().open(viewer, hits.get(index).shop);
             }

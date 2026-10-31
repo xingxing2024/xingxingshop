@@ -66,23 +66,12 @@ public final class ConfirmView implements InventoryHolder {
     public void render() {
         inventory.clear();
 
-        // 边框
-        ItemStack edge = pane(Material.BLACK_STAINED_GLASS_PANE);
-        ItemStack accent = pane(selling
+        // 渐变边框 + 深色底
+        Material accent = selling
                 ? Material.ORANGE_STAINED_GLASS_PANE
-                : Material.LIME_STAINED_GLASS_PANE);
-        for (int i = 0; i < 9; i++) {
-            inventory.setItem(i, edge);
-            inventory.setItem(36 + i, edge);
-        }
-        for (int row = 1; row <= 3; row++) {
-            inventory.setItem(row * 9, edge);
-            inventory.setItem(row * 9 + 8, edge);
-        }
-        inventory.setItem(0, accent);
-        inventory.setItem(8, accent);
-        inventory.setItem(36, accent);
-        inventory.setItem(44, accent);
+                : Material.LIME_STAINED_GLASS_PANE;
+        GuiStyle.fill(inventory, 9, 36);
+        GuiStyle.frame(inventory, accent);
 
         // 中间：商品预览 + 明细
         inventory.setItem(INFO_SLOT, infoIcon());
@@ -92,7 +81,7 @@ public final class ConfirmView implements InventoryHolder {
         double unit = selling ? item.sellPrice(viewer) : item.buyPrice(viewer);
         double total = unit * quantity;
 
-        inventory.setItem(CONFIRM_SLOT, confirmIcon(currency, total));
+        inventory.setItem(CONFIRM_SLOT, GuiStyle.glow(confirmIcon(currency, total)));
         inventory.setItem(CANCEL_SLOT, cancelIcon());
     }
 
@@ -113,13 +102,18 @@ public final class ConfirmView implements InventoryHolder {
         meta.setDisplayName(Text.color("&6&l" + item.displayName()));
 
         List<String> lore = new ArrayList<>();
-        lore.add("");
+        lore.add(Text.color(GuiStyle.SEP));
         lore.add(Text.color("&7操作 &f" + (selling ? "出售给商店" : "从商店购买")));
         lore.add(Text.color("&7数量 &f" + quantity + " &7个"));
         lore.add(Text.color("&7单价 &f" + money(currency, unit)));
-        lore.add("");
+        lore.add(Text.color(GuiStyle.SEP));
         lore.add(Text.color("&7总额 &e" + money(currency, total)));
-        lore.add("");
+        if (currency != null) {
+            double balance = currency.balance(viewer);
+            double after = selling ? balance + total : balance - total;
+            lore.add(Text.color("&7交易后余额 &f" + money(currency, after)));
+        }
+        lore.add(Text.color(GuiStyle.SEP));
         lore.add(Text.color("&8请确认后再操作"));
 
         meta.setLore(lore);
@@ -143,15 +137,17 @@ public final class ConfirmView implements InventoryHolder {
         // 余额预检
         if (!selling && currency != null) {
             double balance = currency.balance(viewer);
+            lore.add(Text.color(GuiStyle.SEP));
             if (balance < total) {
-                lore.add("");
                 lore.add(Text.color("&c余额不足！"));
                 lore.add(Text.color("&7需要 &e" + money(currency, total)
                         + " &7当前 &f" + money(currency, balance)));
+            } else {
+                lore.add(Text.color("&a余额充足"));
+                lore.add(Text.color("&7交易后 &f" + money(currency, balance - total)));
             }
         }
 
-        lore.add("");
         lore.add(Text.color("&a➤ 点击确认"));
         meta.setLore(lore);
         stack.setItemMeta(meta);
