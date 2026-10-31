@@ -148,6 +148,10 @@ public final class StockStore {
         var db = plugin.transactionLog().database();
         if (db.available()) {
             db.upsertStock(item.shopId(), item.itemId(), item.stock(), item.sold());
+            // 跨服时管理员改库存要立刻落库，否则别的服可能按旧库存/默认库存处理
+            if (db.shared()) {
+                db.flush();
+            }
         }
         // 数据库不可用时靠定时任务 / 关服时写文件，避免每次交易都写 YAML
     }
