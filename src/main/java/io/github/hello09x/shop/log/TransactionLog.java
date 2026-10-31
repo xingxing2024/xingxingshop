@@ -309,6 +309,29 @@ public final class TransactionLog {
         return n;
     }
 
+    /**
+     * 玩家最近购买记录（不含管理员交易）
+     */
+    public @NotNull List<Record> recentPurchases(@NotNull String playerName, int limit) {
+        if (database.available()) {
+            return database.query(
+                    new TransactionDatabase.Query(playerName, true, 0, true), 1, limit);
+        }
+        List<Record> out = new ArrayList<>();
+        for (Record r : recent) {
+            if (!r.buying() || r.admin()) {
+                continue;
+            }
+            if (r.playerName().equalsIgnoreCase(playerName)) {
+                out.add(r);
+                if (out.size() >= limit) {
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
     /** 关闭数据库连接 */
     public void close() {
         database.close();

@@ -63,6 +63,20 @@ public final class StockStore {
         applyRows(db.loadStock());
     }
 
+    /**
+     * 跨服时下单 / 打开确认界面前刷新单个商品，避免用 5 秒前的缓存价格。
+     */
+    public void refreshItem(@NotNull ShopItem item) {
+        var db = plugin.transactionLog().database();
+        if (!db.shared()) {
+            return;
+        }
+        var row = db.loadStockRow(item.shopId(), item.itemId());
+        if (row != null) {
+            applyReservation(item, row.stock(), row.sold());
+        }
+    }
+
     private void applyRows(@NotNull java.util.List<TransactionDatabase.StockRow> rows) {
         Map<String, ShopItem> byKey = buildIndex();
         for (var row : rows) {

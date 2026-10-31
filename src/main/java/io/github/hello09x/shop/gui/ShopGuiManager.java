@@ -38,6 +38,7 @@ public final class ShopGuiManager {
      */
     public void openConfirm(@NotNull Player viewer, @NotNull Shop shop, @NotNull ShopItem item,
                             int quantity, boolean selling) {
+        plugin.stocks().refreshItem(item);
         ConfirmView view = new ConfirmView(plugin, shop, item, viewer, quantity, selling);
         viewer.openInventory(view.getInventory());
     }

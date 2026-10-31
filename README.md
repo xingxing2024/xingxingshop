@@ -47,6 +47,9 @@
 - **MySQL 跨服** —— 事务原子扣减，多服共享库存 / 限购 / 交易记录
 - **配置简单** —— 商品一行一个 `bread: 1.5`，数据库只填地址和账号密码
 - **自定义物品** —— 支持 ItemsAdder / Nexo / MMOItems，按完整物品匹配
+- **搜索 / 收藏 / 最近购买** —— `/shop search`、`/shop fav`、`/shop recent`
+- **折扣 / VIP 价** —— 商品支持限时折扣和权限价格
+- **bStats 统计** —— 匿名数据，页面可关闭
 - **音效可配置** —— 购买、余额不足、确认、取消等都可自定义音效
 - **PlaceholderAPI 变量** —— 余额、今日买卖、全服统计
 - **配置自动补全** —— 升级时新配置项自动补上，已有值不动
@@ -102,4 +105,4 @@
 mvn clean package
 ```
 
-产物：`target/XingXingShop-1.0.4.jar`
+产物：`target/XingXingShop-1.0.5.jar`

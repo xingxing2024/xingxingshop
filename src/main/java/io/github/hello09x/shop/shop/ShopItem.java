@@ -3,6 +3,7 @@ package io.github.hello09x.shop.shop;
 import io.github.hello09x.shop.ShopPlugin;
 import io.github.hello09x.shop.util.ChineseNames;
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.NotNull;
@@ -45,6 +46,13 @@ public final class ShopItem {
     private final int limit;
     /** 每日限卖（卖）：-1 表示按价格自动分档，>0 用手写值，0 表示不限 */
     private final int sellLimit;
+    /** 折扣倍率（0.8 = 八折），1 表示无折扣 */
+    private final double discount;
+    /** 折扣截止时间戳，0 = 一直有效 */
+    private final long discountUntil;
+    /** VIP 买价，null = 不启用 */
+    private final Double vipPrice;
+    private final String vipPermission;
 
     private volatile int stock;
     private volatile int sold;
@@ -64,7 +72,11 @@ public final class ShopItem {
             int maxStock,
             boolean dynamic,
             int limit,
-            int sellLimit
+            int sellLimit,
+            double discount,
+            long discountUntil,
+            @Nullable Double vipPrice,
+            @Nullable String vipPermission
     ) {
         this.shopId = shopId;
         this.itemId = itemId;
@@ -83,6 +95,11 @@ public final class ShopItem {
         this.dynamic = dynamic;
         this.limit = limit;
         this.sellLimit = sellLimit;
+        this.discount = discount <= 0 || discount > 1 ? 1 : discount;
+        this.discountUntil = discountUntil;
+        this.vipPrice = vipPrice;
+        this.vipPermission = vipPermission == null || vipPermission.isBlank()
+                ? "xshop.vip" : vipPermission;
     }
 
     // ================================================================
@@ -100,9 +117,50 @@ public final class ShopItem {
         return round(buyPrice * clamp(multiplier));
     }
 
+    /** 当前买入单价（应用折扣和 VIP 价） */
+    public double buyPrice(@Nullable Player player) {
+        if (isVipPlayer(player)) {
+            return round(vipPrice);
+        }
+        return round(buyPrice() * discountMultiplier());
+    }
+
+    /** 当前卖出单价（应用折扣） */
+    public double sellPrice(@Nullable Player player) {
+        return round(sellPrice() * discountMultiplier());
+    }
+
+    public boolean hasDiscount() {
+        return discountMultiplier() < 1;
+    }
+
+    public boolean isVipPlayer(@Nullable Player player) {
+        return player != null && vipPrice != null && player.hasPermission(vipPermission);
+    }
+
+    public double vipPrice() {
+        return vipPrice == null ? 0 : vipPrice;
+    }
+
+    private double discountMultiplier() {
+        if (discount >= 1 || discount <= 0) {
+            return 1;
+        }
+        if (discountUntil > 0 && System.currentTimeMillis() >= discountUntil) {
+            return 1;
+        }
+        return discount;
+    }
+
     /** 基础买入单价（配置里写的） */
     public double baseBuyPrice() {
         return buyPrice;
+    }
+
+    /** 可能的最低买入价（含 VIP 价 / 折扣），用于防低买高卖 */
+    public double minBuyPrice() {
+        double base = vipPrice != null ? Math.min(buyPrice, vipPrice) : buyPrice;
+        return base * discountMultiplier();
     }
 
     /** 基础卖出单价（未计算动态波动和库存倍率） */

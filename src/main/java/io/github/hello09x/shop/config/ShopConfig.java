@@ -32,6 +32,15 @@ public final class ShopConfig {
     /** 收购价高于购买价时自动压价，防止低买高卖刷钱 */
     private boolean antiArbitrage = true;
 
+    /** bStats 统计 */
+    private boolean metrics = true;
+
+    /** GitHub 新版本检查 */
+    private boolean updateCheck = true;
+
+    /** 跨服商店配置同步 */
+    private boolean shopSync = true;
+
     /** 交易记录数据库 */
     private String dbType = "sqlite";
     private String dbHost = "localhost";
@@ -40,6 +49,9 @@ public final class ShopConfig {
     private String dbUrl = "";
     private String dbUser = "";
     private String dbPassword = "";
+    private int dbPoolSize = 4;
+    private int dbConnectionTimeout = 5000;
+    private String dbTablePrefix = "";
 
     /** 交易日志 */
     private boolean logEnabled = true;
@@ -76,12 +88,20 @@ public final class ShopConfig {
                 clampNonNegative(f.getDouble("dynamic.max", 3.0), 3.0)));
         this.sellLimits = f.getBoolean("sell-limits", true);
         this.antiArbitrage = f.getBoolean("anti-arbitrage", true);
+        this.metrics = f.getBoolean("metrics.enabled", true);
+        this.updateCheck = f.getBoolean("update-check", true);
+        this.shopSync = f.getBoolean("database.shop-sync", true);
         this.dbType = f.getString("database.type", "sqlite");
         this.dbHost = f.getString("database.mysql.host", "localhost");
         this.dbPort = f.getInt("database.mysql.port", 3306);
         this.dbName = f.getString("database.mysql.database", "minecraft");
         this.dbUser = f.getString("database.mysql.username", "");
         this.dbPassword = f.getString("database.mysql.password", "");
+        this.dbPoolSize = Math.max(1, Math.min(32, f.getInt("database.mysql.pool-size", 4)));
+        this.dbConnectionTimeout = Math.max(1000, Math.min(30000,
+                f.getInt("database.mysql.connection-timeout", 5000)));
+        String prefix = f.getString("database.table-prefix", "");
+        this.dbTablePrefix = prefix != null && prefix.matches("[A-Za-z0-9_]{0,32}") ? prefix : "";
         // 老配置里写了完整 url 就继续用；没写就按 host/port/database 自动拼
         String explicitUrl = f.getString("database.mysql.url", "");
         this.dbUrl = explicitUrl == null || explicitUrl.isBlank()
@@ -127,6 +147,18 @@ public final class ShopConfig {
 
     public String dbPassword() {
         return dbPassword;
+    }
+
+    public int dbPoolSize() {
+        return dbPoolSize;
+    }
+
+    public int dbConnectionTimeout() {
+        return dbConnectionTimeout;
+    }
+
+    public String dbTablePrefix() {
+        return dbTablePrefix;
     }
 
     public boolean logEnabled() {
@@ -183,6 +215,18 @@ public final class ShopConfig {
 
     public boolean antiArbitrage() {
         return antiArbitrage;
+    }
+
+    public boolean metrics() {
+        return metrics;
+    }
+
+    public boolean updateCheck() {
+        return updateCheck;
+    }
+
+    public boolean shopSync() {
+        return shopSync;
     }
 
     public boolean sellDynamic() {

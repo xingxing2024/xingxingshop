@@ -236,10 +236,16 @@ public final class ShopView implements InventoryHolder {
             lore.add("");
         }
 
-        double unit = selling ? item.sellPrice() : item.buyPrice();
+        double unit = selling ? item.sellPrice(viewer) : item.buyPrice(viewer);
         String price = currency == null ? Currency.formatNumber(unit) : currency.format(unit);
 
         lore.add(Text.color("&7单价 &f" + price + " &8/ 个"));
+        if (item.hasDiscount()) {
+            lore.add(Text.color("&a限时折扣中"));
+        }
+        if (item.isVipPlayer(viewer)) {
+            lore.add(Text.color("&6VIP 专享价"));
+        }
         lore.add("");
 
         if (selling) {

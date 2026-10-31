@@ -13,15 +13,21 @@ import io.github.hello09x.shop.log.DailyReport;
 import io.github.hello09x.shop.log.ReportDeliveryStore;
 import io.github.hello09x.shop.log.TransactionLog;
 import io.github.hello09x.shop.shop.ShopRegistry;
-import io.github.hello09x.shop.storage.StockStore;
-import io.github.hello09x.shop.util.Messages;
+import io.github.hello09x.shop.storage.FavoriteStore;
+import io.github.hello09x.shop.storage.ShopSync;
+import io.github.hello09x.shop.storage.StockStore;import io.github.hello09x.shop.util.Messages;
 import org.bukkit.Bukkit;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bstats.bukkit.Metrics;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * XingXingShop 主类。
@@ -36,12 +42,27 @@ public final class ShopPlugin extends JavaPlugin {
     private ShopRegistry shops;
     private StockStore stocks;
     private LimitStore limits;
+    private FavoriteStore favorites;
+    private ShopSync shopSync;
     private ShopGuiManager gui;
     private ChatInputHandler chatInput;
     private TransactionLog transactionLog;
     private ReportDeliveryStore reportDelivery;
     private DailyReport dailyReport;
     private io.github.hello09x.shop.hook.TrMenuTradeMonitor externalMonitor;
+
+    /** bStats（ID 35029） */
+    private Metrics metrics;
+
+    /** 跨服交易数据库任务；关服时等待这些任务完成 */
+    private final ExecutorService tradeExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "XingXingShop-TradeDB");
+        t.setDaemon(true);
+        return t;
+    });
+    private final ConcurrentLinkedQueue<Runnable> shutdownTasks = new ConcurrentLinkedQueue<>();
+    private final AtomicInteger pendingTrades = new AtomicInteger();
+    private volatile boolean disabling;
 
     public static ShopPlugin getInstance() {
         return instance;
@@ -60,22 +81,38 @@ public final class ShopPlugin extends JavaPlugin {
         this.config.load();
         this.messages = new Messages(this);
 
-        // 商店数据
-        this.shops = new ShopRegistry(this);
-        this.shops.loadAll();
+        // bStats 统计（可在 config.yml 的 metrics.enabled 关闭）
+        if (this.config.metrics()) {
+            try {
+                this.metrics = new Metrics(this, 35029);
+            } catch (Throwable t) {
+                getLogger().warning("bStats 初始化失败：" + t.getMessage());
+            }
+        }
 
-        // 数据库：库存 / 限购 / 交易记录 都存这里（同步初始化，SQLite 很快）
+        // 数据库先初始化：商店配置跨服同步需要先连上库
         this.transactionLog = new TransactionLog(this);
         this.transactionLog.initDatabase();
         this.reportDelivery = new ReportDeliveryStore(this);
         this.reportDelivery.load();
         this.dailyReport = new DailyReport(this);
 
+        // 跨服商店配置：先拉取，再加载本地商店
+        this.shopSync = new ShopSync(this);
+        this.shopSync.pull();
+        this.shops = new ShopRegistry(this);
+        this.shops.loadAll();
+        if (this.shopSync.enabled() && !this.shopSync.hasPulled()) {
+            this.shopSync.push();
+        }
+
         // 库存 / 限购（优先从数据库读，数据库不可用则读文件）
         this.stocks = new StockStore(this);
         this.stocks.load();
         this.limits = new LimitStore(this);
         this.limits.load();
+        this.favorites = new FavoriteStore(this);
+        this.favorites.load();
 
         // GUI
         this.gui = new ShopGuiManager(this);
@@ -151,11 +188,52 @@ public final class ShopPlugin extends JavaPlugin {
             }
         }, 40L, 40L);
 
+        // MySQL 启动时没连上：每分钟重试一次，连上后自动接管库存 / 限购
+        Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
+            var db = transactionLog.database();
+            if (db.type() != io.github.hello09x.shop.log.TransactionDatabase.Type.MYSQL || db.available()) {
+                return;
+            }
+            db.init();
+            if (db.available()) {
+                Bukkit.getScheduler().runTask(this, () -> {
+                    try {
+                        stocks.load();
+                        limits.load();
+                    } catch (Throwable t) {
+                        getLogger().warning("数据库恢复后载入数据失败：" + t.getMessage());
+                    }
+                });
+            }
+        }, 1200L, 1200L);
+
+        // 跨服商店配置轮询
+        Bukkit.getScheduler().runTaskTimerAsynchronously(this, () -> {
+            if (shopSync == null || !shopSync.enabled()) {
+                return;
+            }
+            try {
+                if (shopSync.poll()) {
+                    Bukkit.getScheduler().runTask(this, () -> {
+                        shops.loadAll();
+                        stocks.load();
+                        limits.load();
+                    });
+                }
+            } catch (Throwable t) {
+                getLogger().warning("跨服商店配置同步失败：" + t.getMessage());
+            }
+        }, 200L, 200L);
+
         // PlaceholderAPI 变量
         registerPlaceholders();
 
         // 每日报表
         dailyReport.startScheduler();
+
+        // GitHub 新版本检查（异步，不阻塞启动）
+        Bukkit.getScheduler().runTaskAsynchronously(this,
+                () -> io.github.hello09x.shop.util.UpdateChecker.checkAsync(this));
 
         getLogger().info("启用完成，用时 " + (System.currentTimeMillis() - start) + " ms，"
                 + "商店 " + shops.all().size() + " 个，商品 " + shops.totalItems() + " 件");
@@ -372,6 +450,10 @@ public final class ShopPlugin extends JavaPlugin {
 
     @Override
     public void onDisable() {
+        disabling = true;
+        drainTrades();
+        tradeExecutor.shutdown();
+
         if (externalMonitor != null) externalMonitor.close();
         if (stocks != null) {
             stocks.save();
@@ -379,8 +461,63 @@ public final class ShopPlugin extends JavaPlugin {
         if (limits != null) {
             limits.save();
         }
+        if (favorites != null) {
+            favorites.save();
+        }
         if (transactionLog != null) {
             transactionLog.close();
+        }
+    }
+
+    public boolean isDisabling() {
+        return disabling;
+    }
+
+    public @NotNull ExecutorService tradeExecutor() {
+        return tradeExecutor;
+    }
+
+    public void tradeStarted() {
+        pendingTrades.incrementAndGet();
+    }
+
+    public void tradeFinished() {
+        pendingTrades.decrementAndGet();
+    }
+
+    public void enqueueTradeCompletion(@NotNull Runnable task) {
+        shutdownTasks.add(task);
+    }
+
+    /**
+     * 关服时等待异步交易完成，并把结果在主线程执行，避免钱扣了但没发货/没退款。
+     */
+    private void drainTrades() {
+        long deadline = System.currentTimeMillis() + 10_000L;
+        while (System.currentTimeMillis() < deadline
+                && (pendingTrades.get() > 0 || !shutdownTasks.isEmpty())) {
+            Runnable task;
+            while ((task = shutdownTasks.poll()) != null) {
+                try {
+                    task.run();
+                } catch (Throwable t) {
+                    getLogger().warning("关服处理交易结果失败：" + t.getMessage());
+                }
+            }
+            try {
+                Thread.sleep(20L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
+        Runnable task;
+        while ((task = shutdownTasks.poll()) != null) {
+            try {
+                task.run();
+            } catch (Throwable t) {
+                getLogger().warning("关服处理交易结果失败：" + t.getMessage());
+            }
         }
     }
 
@@ -393,8 +530,14 @@ public final class ShopPlugin extends JavaPlugin {
         messages.reload();
         currencies.detect();
         shops.loadAll();
+        if (shopSync != null) {
+            shopSync.push();
+        }
         stocks.load();
         limits.load();
+        if (favorites != null) {
+            favorites.load();
+        }
         externalMonitor = new io.github.hello09x.shop.hook.TrMenuTradeMonitor(this);
         externalMonitor.start();
     }
@@ -423,6 +566,14 @@ public final class ShopPlugin extends JavaPlugin {
 
     public LimitStore limits() {
         return limits;
+    }
+
+    public FavoriteStore favorites() {
+        return favorites;
+    }
+
+    public ShopSync shopSync() {
+        return shopSync;
     }
 
     public ShopGuiManager gui() {

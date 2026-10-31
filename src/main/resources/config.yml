@@ -58,6 +58,15 @@ sell-limits: true
 # 确定是自己的经济设计、想允许这种情况就改成 false。
 anti-arbitrage: true
 
+# bStats 匿名统计（不收集玩家名 / 数据内容）
+# 统计页面：https://bstats.org/plugin/bukkit/xingxingshop/35029
+# 不想上报就改成 false
+metrics:
+  enabled: true
+
+# 启动时检查 GitHub 新版本（只打日志，不自动下载）
+update-check: true
+
 # ---------------------------------------------------------------------
 #  交易记录
 #
@@ -84,6 +93,13 @@ database:
   # none   = 不存数据库
   type: sqlite
 
+  # 多个插件共用一个库时，可以给表加前缀，避免 shop_* 冲突
+  table-prefix: ''
+
+  # 跨服商店配置同步：一服 /shop reload 后，其他服自动拉取 shops/*.yml
+  # 只在 MySQL 模式生效；单服 / 需要各服不同配置时改成 false
+  shop-sync: true
+
   # MySQL 连接信息（只有 type 改成 mysql 才需要管）
   # 多个服务器填同一份，就能跨服共享库存 / 限购 / 交易记录
   mysql:
@@ -92,6 +108,10 @@ database:
     database: minecraft    # 数据库名（先在 MySQL 里建好这个库）
     username: root         # 数据库账号
     password: ''           # 数据库密码
+
+    # 连接池（大服可以调大，一般 4 够用）
+    pool-size: 4
+    connection-timeout: 5000
 
     # 一般不用管下面这项。
     # 只有用云数据库 / 特殊参数时才需要自己加一行完整连接串：

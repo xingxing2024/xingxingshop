@@ -65,6 +65,10 @@ public final class TransactionService {
             callback.accept(new Outcome(Result.ERROR, 0, name(item)));
             return;
         }
+        if (plugin.isDisabling()) {
+            callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+            return;
+        }
         if (!allowed(player, shop, item)) {
             callback.accept(new Outcome(Result.NO_PERMISSION, 0, name(item)));
             return;
@@ -74,6 +78,12 @@ public final class TransactionService {
         if (currency == null || !currency.available()) {
             callback.accept(new Outcome(Result.NO_CURRENCY, 0, name(item)));
             return;
+        }
+
+        boolean shared = plugin.transactionLog().database().shared();
+        if (shared) {
+            // 下单前用数据库最新库存算价，避免跨服 5 秒缓存导致价格不一致
+            plugin.stocks().refreshItem(item);
         }
 
         // 每日限购
@@ -86,8 +96,6 @@ public final class TransactionService {
             quantity = (int) Math.min(quantity, left);
         }
 
-        boolean shared = plugin.transactionLog().database().shared();
-
         // 库存：跨服时以数据库事务为准，本服缓存可能慢几秒，不在这里拦
         if (!shared && item.isLimitedStock() && item.stock() < quantity) {
             if (item.stock() <= 0) {
@@ -98,7 +106,7 @@ public final class TransactionService {
         }
 
         // 买得起的最大数量（钱不够就自动缩量）
-        double unit = item.buyPrice();
+        double unit = item.buyPrice(player);
         if (!Double.isFinite(unit) || unit < 0) {
             callback.accept(new Outcome(Result.ERROR, 0, name(item)));
             return;
@@ -149,43 +157,50 @@ public final class TransactionService {
         var day = java.time.LocalDate.now().toString();
         var limit = item.isLimited() ? item.limit() : 0;
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            var reserved = db.reserveBuy(item.shopId(), item.itemId(), item.maxStock(),
-                    uuid, day, item.key(), limit, wanted);
+        plugin.tradeStarted();
+        try {
+            plugin.tradeExecutor().execute(() -> {
+                var reserved = db.reserveBuy(item.shopId(), item.itemId(), item.maxStock(),
+                        uuid, day, item.key(), limit, wanted);
 
-            runSync(() -> {
-                int granted = reserved.granted();
-                if (granted < 0) {
-                    currency.deposit(player, paid);
-                    callback.accept(new Outcome(Result.ERROR, 0, name(item)));
-                    return;
-                }
-                if (granted <= 0) {
-                    currency.deposit(player, paid);
-                    Result result = item.isLimitedStock() && reserved.stock() <= 0
-                            ? Result.OUT_OF_STOCK : Result.LIMIT_REACHED;
-                    callback.accept(new Outcome(result, paid, name(item)));
-                    return;
-                }
+                runSync(() -> {
+                    int granted = reserved.granted();
+                    if (granted < 0) {
+                        currency.deposit(player, paid);
+                        callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+                        return;
+                    }
+                    if (granted <= 0) {
+                        currency.deposit(player, paid);
+                        Result result = item.isLimitedStock() && reserved.stock() <= 0
+                                ? Result.OUT_OF_STOCK : Result.LIMIT_REACHED;
+                        callback.accept(new Outcome(result, paid, name(item)));
+                        return;
+                    }
 
-                double finalTotal = paid;
-                if (granted < wanted) {
-                    // 别的服先把库存/限购买走了，退还多扣的钱（按差额退，避免四舍五入误差）
-                    finalTotal = round(unitPrice * granted);
-                    currency.deposit(player, paid - finalTotal);
-                }
+                    double finalTotal = paid;
+                    if (granted < wanted) {
+                        // 别的服先把库存/限购买走了，退还多扣的钱（按差额退，避免四舍五入误差）
+                        finalTotal = round(unitPrice * granted);
+                        currency.deposit(player, paid - finalTotal);
+                    }
 
-                plugin.stocks().applyReservation(item, reserved.stock(), reserved.stockSold());
-                if (item.isLimited()) {
-                    plugin.limits().applyBought(player.getUniqueId(), item, reserved.limitValue());
-                }
+                    plugin.stocks().applyReservation(item, reserved.stock(), reserved.stockSold());
+                    if (item.isLimited()) {
+                        plugin.limits().applyBought(player.getUniqueId(), item, reserved.limitValue());
+                    }
 
-                give(player, item, granted);
-                plugin.transactionLog().record(player, shop.id(), item, name(item),
-                        item.currencyId(), true, granted, unitPrice, finalTotal);
-                callback.accept(new Outcome(Result.SUCCESS, finalTotal, name(item)));
+                    give(player, item, granted);
+                    plugin.transactionLog().record(player, shop.id(), item, name(item),
+                            item.currencyId(), true, granted, unitPrice, finalTotal);
+                    callback.accept(new Outcome(Result.SUCCESS, finalTotal, name(item)));
+                });
             });
-        });
+        } catch (Throwable t) {
+            plugin.tradeFinished();
+            currency.deposit(player, paid);
+            callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+        }
     }
 
     /**
@@ -202,6 +217,10 @@ public final class TransactionService {
             callback.accept(new Outcome(Result.ERROR, 0, name(item)));
             return;
         }
+        if (plugin.isDisabling()) {
+            callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+            return;
+        }
         if (!allowed(player, shop, item)) {
             callback.accept(new Outcome(Result.NO_PERMISSION, 0, name(item)));
             return;
@@ -211,6 +230,11 @@ public final class TransactionService {
         if (currency == null || !currency.available() || !currency.supportsDeposit()) {
             callback.accept(new Outcome(Result.NO_CURRENCY, 0, name(item)));
             return;
+        }
+
+        boolean shared = plugin.transactionLog().database().shared();
+        if (shared) {
+            plugin.stocks().refreshItem(item);
         }
 
         // 每日限卖（按价格自动分档）
@@ -233,7 +257,7 @@ public final class TransactionService {
             quantity = has;
         }
 
-        double unit = item.sellPrice();
+        double unit = item.sellPrice(player);
         if (!Double.isFinite(unit) || unit < 0) {
             callback.accept(new Outcome(Result.ERROR, 0, name(item)));
             return;
@@ -251,7 +275,6 @@ public final class TransactionService {
             return;
         }
 
-        boolean shared = plugin.transactionLog().database().shared();
         if (!shared) {
             if (!currency.deposit(player, total)) {
                 give(player, item, quantity);
@@ -276,57 +299,75 @@ public final class TransactionService {
         var day = java.time.LocalDate.now().toString();
         var sellLimit = item.isSellLimited() ? item.sellLimit() : 0;
 
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-            var reserved = db.reserveSell(item.shopId(), item.itemId(), item.maxStock(),
-                    uuid, day, item.key(), sellLimit, wanted);
+        plugin.tradeStarted();
+        try {
+            plugin.tradeExecutor().execute(() -> {
+                var reserved = db.reserveSell(item.shopId(), item.itemId(), item.maxStock(),
+                        uuid, day, item.key(), sellLimit, wanted);
 
-            runSync(() -> {
-                int granted = reserved.granted();
-                if (granted < 0) {
-                    give(player, item, wanted);
-                    callback.accept(new Outcome(Result.ERROR, 0, name(item)));
-                    return;
-                }
-                if (granted <= 0) {
-                    give(player, item, wanted);
-                    callback.accept(new Outcome(Result.SELL_LIMIT_REACHED, item.sellLimit(), name(item)));
-                    return;
-                }
+                runSync(() -> {
+                    int granted = reserved.granted();
+                    if (granted < 0) {
+                        give(player, item, wanted);
+                        callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+                        return;
+                    }
+                    if (granted <= 0) {
+                        give(player, item, wanted);
+                        callback.accept(new Outcome(Result.SELL_LIMIT_REACHED, item.sellLimit(), name(item)));
+                        return;
+                    }
 
-                double finalTotal = paid;
-                if (granted < wanted) {
-                    // 别的服先把限卖额度用掉了，把多扣的物品还回去
-                    give(player, item, wanted - granted);
-                    finalTotal = round(unitPrice * granted);
-                }
+                    double finalTotal = paid;
+                    if (granted < wanted) {
+                        // 别的服先把限卖额度用掉了，把多扣的物品还回去
+                        give(player, item, wanted - granted);
+                        finalTotal = round(unitPrice * granted);
+                    }
 
-                // 库存额度确认成功后才到账，避免「先到账、事务失败、钱已被花掉」
-                if (!currency.deposit(player, finalTotal)) {
-                    give(player, item, granted);
-                    db.releaseSell(item.shopId(), item.itemId(), uuid, day, item.key(),
-                            sellLimit, granted, Math.max(0, reserved.stock() - reserved.stockBefore()));
-                    callback.accept(new Outcome(Result.ERROR, 0, name(item)));
-                    return;
-                }
+                    // 库存额度确认成功后才到账，避免「先到账、事务失败、钱已被花掉」
+                    if (!currency.deposit(player, finalTotal)) {
+                        give(player, item, granted);
+                        db.releaseSell(item.shopId(), item.itemId(), uuid, day, item.key(),
+                                sellLimit, granted, Math.max(0, reserved.stock() - reserved.stockBefore()));
+                        callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+                        return;
+                    }
 
-                plugin.stocks().applyReservation(item, reserved.stock(), reserved.stockSold());
-                if (item.isSellLimited()) {
-                    plugin.limits().applySold(player.getUniqueId(), item, reserved.limitValue());
-                }
+                    plugin.stocks().applyReservation(item, reserved.stock(), reserved.stockSold());
+                    if (item.isSellLimited()) {
+                        plugin.limits().applySold(player.getUniqueId(), item, reserved.limitValue());
+                    }
 
-                plugin.transactionLog().record(player, shop.id(), item, name(item),
-                        item.currencyId(), false, granted, unitPrice, finalTotal);
-                callback.accept(new Outcome(Result.SUCCESS, finalTotal, name(item)));
+                    plugin.transactionLog().record(player, shop.id(), item, name(item),
+                            item.currencyId(), false, granted, unitPrice, finalTotal);
+                    callback.accept(new Outcome(Result.SUCCESS, finalTotal, name(item)));
+                });
             });
-        });
+        } catch (Throwable t) {
+            plugin.tradeFinished();
+            give(player, item, wanted);
+            callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+        }
     }
 
-    /** 把异步结果切回主线程；插件已关闭时直接忽略 */
+    /** 把异步结果切回主线程；关服时排队，由 onDisable 在主线程执行 */
     private void runSync(@NotNull Runnable task) {
+        Runnable wrapped = () -> {
+            try {
+                task.run();
+            } finally {
+                plugin.tradeFinished();
+            }
+        };
+        if (plugin.isDisabling()) {
+            plugin.enqueueTradeCompletion(wrapped);
+            return;
+        }
         try {
-            Bukkit.getScheduler().runTask(plugin, task);
+            Bukkit.getScheduler().runTask(plugin, wrapped);
         } catch (Throwable t) {
-            plugin.getLogger().warning("交易结果无法回到主线程：" + t.getMessage());
+            plugin.enqueueTradeCompletion(wrapped);
         }
     }
 

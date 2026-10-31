@@ -46,6 +46,8 @@ public final class TransactionDatabase {
 
     private final ShopPlugin plugin;
     private final Type type;
+    /** 表名前缀（多插件共库时用） */
+    private final String prefix;
 
     /** SQLite 连接串 */
     private String sqliteUrl;
@@ -71,6 +73,7 @@ public final class TransactionDatabase {
             case "none", "off", "disabled" -> Type.NONE;
             default -> Type.SQLITE;
         };
+        this.prefix = plugin.config().dbTablePrefix();
     }
 
     public @NotNull Type type() {
@@ -97,9 +100,13 @@ public final class TransactionDatabase {
     /**
      * 建库建表（异步调用）
      */
-    public void init() {
+    public synchronized void init() {
         if (type == Type.NONE) {
             return;
+        }
+        available = false;
+        if (type == Type.MYSQL) {
+            closeMysql();
         }
         try {
             if (type == Type.SQLITE) {
@@ -125,9 +132,9 @@ public final class TransactionDatabase {
         hc.setUsername(cfg.dbUser());
         hc.setPassword(cfg.dbPassword());
         hc.setPoolName("XingXingShop-DB");
-        hc.setMaximumPoolSize(4);
+        hc.setMaximumPoolSize(plugin.config().dbPoolSize());
         hc.setMinimumIdle(1);
-        hc.setConnectionTimeout(5000);
+        hc.setConnectionTimeout(plugin.config().dbConnectionTimeout());
         hc.setValidationTimeout(3000);
         hc.setMaxLifetime(1_800_000);
         hc.setIdleTimeout(600_000);
@@ -201,9 +208,19 @@ public final class TransactionDatabase {
         }
     }
 
+    /** 加表名前缀 */
+    private @NotNull String table(@NotNull String name) {
+        return prefix + name;
+    }
+
+    /** 加索引名前缀 */
+    private @NotNull String index(@NotNull String name) {
+        return prefix + name;
+    }
+
     private void createTable() throws SQLException {
         String sql = """
-                CREATE TABLE IF NOT EXISTS shop_transaction (
+                CREATE TABLE IF NOT EXISTS %s (
                     id          %s,
                     time        BIGINT      NOT NULL,
                     player_name VARCHAR(32) NOT NULL,
@@ -219,6 +236,7 @@ public final class TransactionDatabase {
                     admin       %s          NOT NULL DEFAULT 0
                 )
                 """.formatted(
+                table("shop_transaction"),
                 type == Type.MYSQL
                         ? "BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY"
                         : "INTEGER PRIMARY KEY AUTOINCREMENT",
@@ -237,18 +255,18 @@ public final class TransactionDatabase {
 
                 // 库存表
                 st.execute("""
-                        CREATE TABLE IF NOT EXISTS shop_stock (
+                        CREATE TABLE IF NOT EXISTS %s (
                             shop_id VARCHAR(64) NOT NULL,
                             item_id VARCHAR(64) NOT NULL,
                             stock   INT         NOT NULL,
                             sold    INT         NOT NULL,
                             PRIMARY KEY (shop_id, item_id)
                         )
-                        """);
+                        """.formatted(table("shop_stock")));
 
                 // 每日限购 / 限卖表
                 st.execute("""
-                        CREATE TABLE IF NOT EXISTS shop_limit (
+                        CREATE TABLE IF NOT EXISTS %s (
                             day         VARCHAR(10) NOT NULL,
                             player_uuid VARCHAR(36) NOT NULL,
                             item_key    VARCHAR(160) NOT NULL,
@@ -256,15 +274,30 @@ public final class TransactionDatabase {
                             sold        INT         NOT NULL DEFAULT 0,
                             PRIMARY KEY (day, player_uuid, item_key)
                         )
-                        """);
+                        """.formatted(table("shop_limit")));
 
                 // 个人日报投递记录（记录每个玩家最后一次收到日报的日期）
                 st.execute("""
-                        CREATE TABLE IF NOT EXISTS shop_report_seen (
+                        CREATE TABLE IF NOT EXISTS %s (
                             player_uuid VARCHAR(36) NOT NULL PRIMARY KEY,
                             last_day    VARCHAR(10) NOT NULL
                         )
-                        """);
+                        """.formatted(table("shop_report_seen")));
+
+                // 跨服商店配置同步
+                st.execute("""
+                        CREATE TABLE IF NOT EXISTS %s (
+                            shop_id    VARCHAR(128) NOT NULL PRIMARY KEY,
+                            content    LONGTEXT     NOT NULL,
+                            updated_at BIGINT       NOT NULL
+                        )
+                        """.formatted(table("shop_config")));
+                st.execute("""
+                        CREATE TABLE IF NOT EXISTS %s (
+                            k VARCHAR(32)  NOT NULL PRIMARY KEY,
+                            v VARCHAR(255) NOT NULL
+                        )
+                        """.formatted(table("shop_meta")));
             }
         } finally {
             closeQuietly(conn);
@@ -273,7 +306,7 @@ public final class TransactionDatabase {
 
     private void safeIndex(@NotNull Statement st, @NotNull String name, @NotNull String column) {
         try {
-            st.execute("CREATE INDEX " + name + " ON shop_transaction(" + column + ")");
+            st.execute("CREATE INDEX " + index(name) + " ON " + table("shop_transaction") + "(" + column + ")");
         } catch (SQLException ignored) {
             // 索引已存在
         }
@@ -304,11 +337,11 @@ public final class TransactionDatabase {
 
     private void doInsert(@NotNull TransactionLog.Record rec) throws SQLException {
         String sql = """
-                INSERT INTO shop_transaction
+                INSERT INTO %s
                 (time, player_name, player_uuid, shop_id, item_id, item_name,
                  currency, buying, quantity, unit_price, total, admin)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """;
+                """.formatted(table("shop_transaction"));
         Connection conn = null;
         try {
             conn = connection();
@@ -386,7 +419,7 @@ public final class TransactionDatabase {
         }
         flush();
         StringBuilder sql = new StringBuilder(
-                "SELECT * FROM shop_transaction WHERE 1=1");
+                "SELECT * FROM " + table("shop_transaction") + " WHERE 1=1");
         List<Object> params = new ArrayList<>();
         buildWhere(sql, params, q);
         sql.append(" ORDER BY time DESC LIMIT ? OFFSET ?");
@@ -422,7 +455,7 @@ public final class TransactionDatabase {
         }
         flush();
         StringBuilder sql = new StringBuilder(
-                "SELECT COUNT(*) FROM shop_transaction WHERE 1=1");
+                "SELECT COUNT(*) FROM " + table("shop_transaction") + " WHERE 1=1");
         List<Object> params = new ArrayList<>();
         buildWhere(sql, params, q);
         Connection conn = null;
@@ -453,9 +486,9 @@ public final class TransactionDatabase {
                 .atStartOfDay(java.time.ZoneId.systemDefault())
                 .toInstant().toEpochMilli();
         String sql = """
-                SELECT COALESCE(SUM(quantity), 0) FROM shop_transaction
+                SELECT COALESCE(SUM(quantity), 0) FROM %s
                 WHERE player_uuid = ? AND item_id = ? AND buying = ? AND time >= ? AND admin = 0
-                """;
+                """.formatted(table("shop_transaction"));
         Connection conn = null;
         try {
             conn = connection();
@@ -535,7 +568,7 @@ public final class TransactionDatabase {
         }
         writer.execute(() -> {
             String sql = upsertSql(
-                    "shop_stock",
+                    table("shop_stock"),
                     "shop_id, item_id, stock, sold",
                     "?, ?, ?, ?",
                     "stock = ?, sold = ?",
@@ -574,7 +607,7 @@ public final class TransactionDatabase {
         try {
             conn = connection();
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT shop_id, item_id, stock, sold FROM shop_stock");
+                    "SELECT shop_id, item_id, stock, sold FROM " + table("shop_stock"));
                  ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     out.add(new StockRow(
@@ -590,6 +623,35 @@ public final class TransactionDatabase {
             closeQuietly(conn);
         }
         return out;
+    }
+
+    /**
+     * 读单个商品的库存（确认界面 / 下单前刷新价格用）
+     */
+    public @Nullable StockRow loadStockRow(@NotNull String shopId, @NotNull String itemId) {
+        if (!available()) {
+            return null;
+        }
+        Connection conn = null;
+        try {
+            conn = connection();
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT shop_id, item_id, stock, sold FROM " + table("shop_stock") + " WHERE shop_id = ? AND item_id = ?")) {
+                ps.setString(1, shopId);
+                ps.setString(2, itemId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return new StockRow(rs.getString("shop_id"), rs.getString("item_id"),
+                                rs.getInt("stock"), rs.getInt("sold"));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().warning("读取单个库存失败：" + e.getMessage());
+        } finally {
+            closeQuietly(conn);
+        }
+        return null;
     }
 
     // ================================================================
@@ -629,7 +691,7 @@ public final class TransactionDatabase {
             int stock;
             int stockSold;
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT stock, sold FROM shop_stock WHERE shop_id = ? AND item_id = ? FOR UPDATE")) {
+                    "SELECT stock, sold FROM " + table("shop_stock") + " WHERE shop_id = ? AND item_id = ? FOR UPDATE")) {
                 ps.setString(1, shopId);
                 ps.setString(2, itemId);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -647,7 +709,7 @@ public final class TransactionDatabase {
             if (limit > 0) {
                 ensureLimitRow(conn, day, playerUuid, itemKey);
                 try (PreparedStatement ps = conn.prepareStatement(
-                        "SELECT bought FROM shop_limit WHERE day = ? AND player_uuid = ? AND item_key = ? FOR UPDATE")) {
+                        "SELECT bought FROM " + table("shop_limit") + " WHERE day = ? AND player_uuid = ? AND item_key = ? FOR UPDATE")) {
                     ps.setString(1, day);
                     ps.setString(2, playerUuid);
                     ps.setString(3, itemKey);
@@ -670,7 +732,7 @@ public final class TransactionDatabase {
             if (qty > 0) {
                 int stockAfter = maxStock > 0 ? stock - qty : stock;
                 try (PreparedStatement ps = conn.prepareStatement(
-                        "UPDATE shop_stock SET stock = ?, sold = ? WHERE shop_id = ? AND item_id = ?")) {
+                        "UPDATE " + table("shop_stock") + " SET stock = ?, sold = ? WHERE shop_id = ? AND item_id = ?")) {
                     ps.setInt(1, stockAfter);
                     ps.setInt(2, stockSold + qty);
                     ps.setString(3, shopId);
@@ -679,7 +741,7 @@ public final class TransactionDatabase {
                 }
                 if (limit > 0) {
                     try (PreparedStatement ps = conn.prepareStatement(
-                            "UPDATE shop_limit SET bought = bought + ? WHERE day = ? AND player_uuid = ? AND item_key = ?")) {
+                            "UPDATE " + table("shop_limit") + " SET bought = bought + ? WHERE day = ? AND player_uuid = ? AND item_key = ?")) {
                         ps.setInt(1, qty);
                         ps.setString(2, day);
                         ps.setString(3, playerUuid);
@@ -725,7 +787,7 @@ public final class TransactionDatabase {
             int stock;
             int stockSold;
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT stock, sold FROM shop_stock WHERE shop_id = ? AND item_id = ? FOR UPDATE")) {
+                    "SELECT stock, sold FROM " + table("shop_stock") + " WHERE shop_id = ? AND item_id = ? FOR UPDATE")) {
                 ps.setString(1, shopId);
                 ps.setString(2, itemId);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -743,7 +805,7 @@ public final class TransactionDatabase {
             if (sellLimit > 0) {
                 ensureLimitRow(conn, day, playerUuid, itemKey);
                 try (PreparedStatement ps = conn.prepareStatement(
-                        "SELECT sold FROM shop_limit WHERE day = ? AND player_uuid = ? AND item_key = ? FOR UPDATE")) {
+                        "SELECT sold FROM " + table("shop_limit") + " WHERE day = ? AND player_uuid = ? AND item_key = ? FOR UPDATE")) {
                     ps.setString(1, day);
                     ps.setString(2, playerUuid);
                     ps.setString(3, itemKey);
@@ -764,7 +826,7 @@ public final class TransactionDatabase {
                 int stockAfter = maxStock > 0 ? Math.min(maxStock, stock + qty) : stock;
                 int soldAfter = stockSold + qty;
                 try (PreparedStatement ps = conn.prepareStatement(
-                        "UPDATE shop_stock SET stock = ?, sold = ? WHERE shop_id = ? AND item_id = ?")) {
+                        "UPDATE " + table("shop_stock") + " SET stock = ?, sold = ? WHERE shop_id = ? AND item_id = ?")) {
                     ps.setInt(1, stockAfter);
                     ps.setInt(2, soldAfter);
                     ps.setString(3, shopId);
@@ -773,7 +835,7 @@ public final class TransactionDatabase {
                 }
                 if (sellLimit > 0) {
                     try (PreparedStatement ps = conn.prepareStatement(
-                            "UPDATE shop_limit SET sold = sold + ? WHERE day = ? AND player_uuid = ? AND item_key = ?")) {
+                            "UPDATE " + table("shop_limit") + " SET sold = sold + ? WHERE day = ? AND player_uuid = ? AND item_key = ?")) {
                         ps.setInt(1, qty);
                         ps.setString(2, day);
                         ps.setString(3, playerUuid);
@@ -821,7 +883,7 @@ public final class TransactionDatabase {
             conn.setAutoCommit(false);
             if (stockAdded > 0) {
                 try (PreparedStatement ps = conn.prepareStatement(
-                        "UPDATE shop_stock SET stock = GREATEST(0, stock - ?) "
+                        "UPDATE " + table("shop_stock") + " SET stock = GREATEST(0, stock - ?) "
                                 + "WHERE shop_id = ? AND item_id = ?")) {
                     ps.setInt(1, stockAdded);
                     ps.setString(2, shopId);
@@ -831,7 +893,7 @@ public final class TransactionDatabase {
             }
             if (sellLimit > 0) {
                 try (PreparedStatement ps = conn.prepareStatement(
-                        "UPDATE shop_limit SET sold = GREATEST(0, sold - ?) "
+                        "UPDATE " + table("shop_limit") + " SET sold = GREATEST(0, sold - ?) "
                                 + "WHERE day = ? AND player_uuid = ? AND item_key = ?")) {
                     ps.setInt(1, quantity);
                     ps.setString(2, day);
@@ -853,7 +915,7 @@ public final class TransactionDatabase {
     private void ensureStockRow(@NotNull Connection conn, @NotNull String shopId,
                                 @NotNull String itemId, int maxStock) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO shop_stock (shop_id, item_id, stock, sold) VALUES (?, ?, ?, 0) "
+                "INSERT INTO " + table("shop_stock") + " (shop_id, item_id, stock, sold) VALUES (?, ?, ?, 0) "
                         + "ON DUPLICATE KEY UPDATE sold = sold")) {
             ps.setString(1, shopId);
             ps.setString(2, itemId);
@@ -866,7 +928,7 @@ public final class TransactionDatabase {
     private void ensureLimitRow(@NotNull Connection conn, @NotNull String day,
                                 @NotNull String playerUuid, @NotNull String itemKey) throws SQLException {
         try (PreparedStatement ps = conn.prepareStatement(
-                "INSERT INTO shop_limit (day, player_uuid, item_key, bought, sold) VALUES (?, ?, ?, 0, 0) "
+                "INSERT INTO " + table("shop_limit") + " (day, player_uuid, item_key, bought, sold) VALUES (?, ?, ?, 0, 0) "
                         + "ON DUPLICATE KEY UPDATE bought = bought")) {
             ps.setString(1, day);
             ps.setString(2, playerUuid);
@@ -915,7 +977,7 @@ public final class TransactionDatabase {
         }
         writer.execute(() -> {
             String sql = upsertSql(
-                    "shop_limit",
+                    table("shop_limit"),
                     "day, player_uuid, item_key, bought, sold",
                     "?, ?, ?, ?, ?",
                     "bought = ?, sold = ?",
@@ -955,7 +1017,7 @@ public final class TransactionDatabase {
         try {
             conn = connection();
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT day, player_uuid, item_key, bought, sold FROM shop_limit WHERE day = ?")) {
+                    "SELECT day, player_uuid, item_key, bought, sold FROM " + table("shop_limit") + " WHERE day = ?")) {
                 ps.setString(1, day);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
@@ -988,7 +1050,7 @@ public final class TransactionDatabase {
         try {
             conn = connection();
             try (Statement st = conn.createStatement();
-                 ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM shop_limit")) {
+                 ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM " + table("shop_limit"))) {
                 return rs.next() && rs.getInt(1) > 0;
             }
         } catch (SQLException e) {
@@ -1010,7 +1072,7 @@ public final class TransactionDatabase {
             try {
                 conn = connection();
                 try (PreparedStatement ps = conn.prepareStatement(
-                        "DELETE FROM shop_limit WHERE day < ?")) {
+                        "DELETE FROM " + table("shop_limit") + " WHERE day < ?")) {
                     ps.setString(1, day);
                     ps.executeUpdate();
                 }
@@ -1041,7 +1103,7 @@ public final class TransactionDatabase {
         try {
             conn = connection();
             try (Statement st = conn.createStatement();
-                 ResultSet rs = st.executeQuery("SELECT player_uuid, last_day FROM shop_report_seen")) {
+                 ResultSet rs = st.executeQuery("SELECT player_uuid, last_day FROM " + table("shop_report_seen"))) {
                 while (rs.next()) {
                     out.put(rs.getString("player_uuid"), rs.getString("last_day"));
                 }
@@ -1063,7 +1125,7 @@ public final class TransactionDatabase {
         }
         writer.execute(() -> {
             String sql = upsertSql(
-                    "shop_report_seen",
+                    table("shop_report_seen"),
                     "player_uuid, last_day",
                     "?, ?",
                     "last_day = ?",
@@ -1084,6 +1146,97 @@ public final class TransactionDatabase {
                 closeQuietly(conn);
             }
         });
+    }
+
+    // ================================================================
+    //  跨服商店配置同步
+    // ================================================================
+
+    public @NotNull Map<String, String> loadShopConfigs() {
+        Map<String, String> out = new java.util.HashMap<>();
+        if (!available()) {
+            return out;
+        }
+        Connection conn = null;
+        try {
+            conn = connection();
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT shop_id, content FROM " + table("shop_config"))) {
+                while (rs.next()) {
+                    out.put(rs.getString(1), rs.getString(2));
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().warning("读取商店配置失败：" + e.getMessage());
+        } finally {
+            closeQuietly(conn);
+        }
+        return out;
+    }
+
+    public long loadShopConfigVersion() {
+        if (!available()) {
+            return 0;
+        }
+        Connection conn = null;
+        try {
+            conn = connection();
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "SELECT v FROM " + table("shop_meta") + " WHERE k = 'version'");
+                 ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? parseLong(rs.getString(1)) : 0;
+            }
+        } catch (SQLException e) {
+            return 0;
+        } finally {
+            closeQuietly(conn);
+        }
+    }
+
+    public void replaceShopConfigs(@NotNull Map<String, String> configs, long version) {
+        if (!available()) {
+            return;
+        }
+        Connection conn = null;
+        try {
+            conn = connection();
+            conn.setAutoCommit(false);
+            try (Statement st = conn.createStatement()) {
+                st.executeUpdate("DELETE FROM " + table("shop_config"));
+            }
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO " + table("shop_config") + " (shop_id, content, updated_at) VALUES (?, ?, ?)")) {
+                long now = System.currentTimeMillis();
+                for (var entry : configs.entrySet()) {
+                    ps.setString(1, entry.getKey());
+                    ps.setString(2, entry.getValue());
+                    ps.setLong(3, now);
+                    ps.addBatch();
+                }
+                ps.executeBatch();
+            }
+            String upsert = upsertSql(table("shop_meta"), "k, v", "?, ?", "v = ?", "(k)");
+            try (PreparedStatement ps = conn.prepareStatement(upsert)) {
+                ps.setString(1, "version");
+                ps.setString(2, Long.toString(version));
+                ps.setString(3, Long.toString(version));
+                ps.executeUpdate();
+            }
+            conn.commit();
+        } catch (Throwable t) {
+            rollbackQuietly(conn);
+            plugin.getLogger().warning("保存商店配置失败：" + t.getMessage());
+        } finally {
+            closeQuietly(conn);
+        }
+    }
+
+    private static long parseLong(@Nullable String raw) {
+        try {
+            return raw == null ? 0 : Long.parseLong(raw);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     /**

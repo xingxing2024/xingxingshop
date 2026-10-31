@@ -146,7 +146,7 @@ public final class ShopListMenu implements InventoryHolder {
         int preview = Math.min(4, items.size());
         for (int i = 0; i < preview; i++) {
             ShopItem item = items.get(i);
-            double price = selling ? item.sellPrice() : item.buyPrice();
+            double price = selling ? item.sellPrice(viewer) : item.buyPrice(viewer);
             lore.add(Text.color("&8▪ &f" + displayNameOf(item) + " &7" + fmt(price)));
         }
         if (items.size() > preview) {
@@ -157,7 +157,7 @@ public final class ShopListMenu implements InventoryHolder {
         if (!items.isEmpty()) {
             double min = Double.MAX_VALUE, max = -1;
             for (ShopItem item : items) {
-                double p = selling ? item.sellPrice() : item.buyPrice();
+                double p = selling ? item.sellPrice(viewer) : item.buyPrice(viewer);
                 min = Math.min(min, p);
                 max = Math.max(max, p);
             }

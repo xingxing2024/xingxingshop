@@ -114,7 +114,7 @@ public final class ShopRegistry {
                 for (Shop buyShop : byType(Shop.Type.BUY)) {
                     for (ShopItem buyItem : buyShop.items()) {
                         if (sameCurrency(sellItem, buyItem) && sameProduct(sellItem, buyItem)) {
-                            minBuy = Math.min(minBuy, buyItem.baseBuyPrice());
+                            minBuy = Math.min(minBuy, buyItem.minBuyPrice());
                         }
                     }
                 }
@@ -144,6 +144,35 @@ public final class ShopRegistry {
         String ca = a.currencyId() != null ? a.currencyId() : plugin.config().currencyDefault();
         String cb = b.currencyId() != null ? b.currencyId() : plugin.config().currencyDefault();
         return ca.equalsIgnoreCase(cb);
+    }
+
+    private double sanitizeDiscount(double value) {
+        if (!Double.isFinite(value) || value <= 0 || value > 1) {
+            return 1;
+        }
+        return value;
+    }
+
+    private long parseDiscountUntil(@Nullable String raw) {
+        if (raw == null || raw.isBlank()) {
+            return 0;
+        }
+        try {
+            String text = raw.trim();
+            java.time.LocalDateTime time;
+            if (text.length() == 10) {
+                time = java.time.LocalDate.parse(text).atTime(23, 59, 59);
+            } else if (text.contains("T")) {
+                time = java.time.LocalDateTime.parse(text);
+            } else {
+                time = java.time.LocalDateTime.parse(text,
+                        java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+            }
+            return time.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+        } catch (Throwable t) {
+            plugin.getLogger().warning("折扣截止时间格式错误：" + raw + "（可用 2026-12-31 或 2026-12-31 23:59）");
+            return 0;
+        }
     }
 
     private double sanitizePrice(double value, @NotNull String shopId,
@@ -290,6 +319,13 @@ public final class ShopRegistry {
                         material, 1, s.getString("name"), lore,
                         s.getInt("custom-model-data", 0), s.getBoolean("glow", false));
 
+        double discount = sanitizeDiscount(s.getDouble("discount", 1));
+        long discountUntil = parseDiscountUntil(s.getString("discount-until"));
+        Double vipPrice = s.contains("vip-price")
+                ? sanitizePrice(s.getDouble("vip-price"), shopId, itemId, "vip-price")
+                : null;
+        String vipPermission = s.getString("vip-permission");
+
         return new ShopItem(
                 shopId, itemId, display, material, customTemplate, customId,
                 buyPrice,
@@ -302,7 +338,8 @@ public final class ShopRegistry {
                 s.getBoolean("dynamic", false),
                 s.getInt("limit", 0),
                 // 单卖的每日上限：-1 = 按价格自动分档，0 = 不限，>0 = 手写值
-                s.getInt("sell-limit", sell ? -1 : 0)
+                s.getInt("sell-limit", sell ? -1 : 0),
+                discount, discountUntil, vipPrice, vipPermission
         );
     }
 
@@ -401,6 +438,11 @@ public final class ShopRegistry {
                 : (sell ? -1 : 0);
         boolean dynamic = boolOpt(opts, "dynamic", false);
         int slot = normalizeSlot(intOpt(opts, "slot", -1));
+        double discount = sanitizeDiscount(doubleOpt(opts, "discount", 1));
+        long discountUntil = parseDiscountUntil(opts.get("discount-until"));
+        Double vipPrice = opts.containsKey("vip-price")
+                ? sanitizePrice(parse(opts.get("vip-price"), 0), shopId, parts[0], "vip-price")
+                : null;
 
         double buyPrice;
         Double sellPrice;
@@ -430,7 +472,8 @@ public final class ShopRegistry {
                 opts.get("currency"),
                 slot != -1 ? slot : autoSlot,
                 opts.get("permission"),
-                stock, dynamic, limit, sellLimit
+                stock, dynamic, limit, sellLimit,
+                discount, discountUntil, vipPrice, opts.get("vip-permission")
         );
     }
 
@@ -449,6 +492,18 @@ public final class ShopRegistry {
     private static boolean boolOpt(@NotNull Map<String, String> opts, @NotNull String key, boolean fallback) {
         String raw = opts.get(key);
         return raw == null ? fallback : Boolean.parseBoolean(raw.trim());
+    }
+
+    private static double doubleOpt(@NotNull Map<String, String> opts, @NotNull String key, double fallback) {
+        String raw = opts.get(key);
+        if (raw == null) {
+            return fallback;
+        }
+        try {
+            return Double.parseDouble(raw.trim());
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
     }
 
     private static @Nullable Material matchMaterial(@Nullable String name) {

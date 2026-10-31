@@ -6,7 +6,7 @@
 
     <groupId>io.github.hello09x</groupId>
     <artifactId>xingxing-shop</artifactId>
-    <version>1.0.4</version>
+    <version>1.0.5</version>
     <packaging>jar</packaging>
 
     <name>XingXingShop</name>
@@ -97,6 +97,14 @@
             <version>5.1.0</version>
             <scope>compile</scope>
         </dependency>
+
+        <!-- bStats 统计 -->
+        <dependency>
+            <groupId>org.bstats</groupId>
+            <artifactId>bstats-bukkit</artifactId>
+            <version>3.1.0</version>
+            <scope>compile</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -147,12 +155,18 @@
                                     <include>com.mysql:mysql-connector-j</include>
                                     <include>com.google.protobuf:protobuf-java</include>
                                     <include>com.zaxxer:HikariCP</include>
+                                    <include>org.bstats:bstats-bukkit</include>
+                                    <include>org.bstats:bstats-base</include>
                                 </includes>
                             </artifactSet>
                             <relocations>
                                 <relocation>
                                     <pattern>com.zaxxer.hikari</pattern>
                                     <shadedPattern>io.github.hello09x.shop.lib.hikari</shadedPattern>
+                                </relocation>
+                                <relocation>
+                                    <pattern>org.bstats</pattern>
+                                    <shadedPattern>io.github.hello09x.shop.lib.bstats</shadedPattern>
                                 </relocation>
                             </relocations>
                             <filters>
