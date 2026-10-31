@@ -4,6 +4,7 @@ import io.github.hello09x.shop.ShopPlugin;
 import io.github.hello09x.shop.currency.Currency;
 import io.github.hello09x.shop.util.ChineseNames;
 import io.github.hello09x.shop.util.Messages;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -12,6 +13,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 /**
  * 交易引擎。所有买入 / 卖出都走这里。
@@ -48,26 +50,39 @@ public final class TransactionService {
     // ================================================================
 
     /**
-     * @param quantity 买几个
+     * 买入。
+     *
+     * <p>SQLite 直接当前线程完成；MySQL 跨服把库存事务丢到异步线程，
+     * 结果回到主线程后再发货 / 提示，避免远程数据库卡主线程。</p>
      */
-    public @NotNull Outcome buy(@NotNull Player player, @NotNull Shop shop, @NotNull ShopItem item, int quantity) {
+    public void buy(
+            @NotNull Player player,
+            @NotNull Shop shop,
+            @NotNull ShopItem item,
+            int quantity,
+            @NotNull Consumer<Outcome> callback
+    ) {
         if (quantity <= 0) {
-            return new Outcome(Result.ERROR, 0, name(item));
+            callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+            return;
         }
         if (!allowed(player, shop, item)) {
-            return new Outcome(Result.NO_PERMISSION, 0, name(item));
+            callback.accept(new Outcome(Result.NO_PERMISSION, 0, name(item)));
+            return;
         }
 
         Currency currency = plugin.currencies().getOrDefault(item.currencyId());
         if (currency == null || !currency.available()) {
-            return new Outcome(Result.NO_CURRENCY, 0, name(item));
+            callback.accept(new Outcome(Result.NO_CURRENCY, 0, name(item)));
+            return;
         }
 
         // 每日限购
         if (item.isLimited()) {
             long left = plugin.limits().remaining(player.getUniqueId(), item);
             if (left <= 0) {
-                return new Outcome(Result.LIMIT_REACHED, item.limit(), name(item));
+                callback.accept(new Outcome(Result.LIMIT_REACHED, item.limit(), name(item)));
+                return;
             }
             quantity = (int) Math.min(quantity, left);
         }
@@ -77,7 +92,8 @@ public final class TransactionService {
         // 库存：跨服时以数据库事务为准，本服缓存可能慢几秒，不在这里拦
         if (!shared && item.isLimitedStock() && item.stock() < quantity) {
             if (item.stock() <= 0) {
-                return new Outcome(Result.OUT_OF_STOCK, 0, name(item));
+                callback.accept(new Outcome(Result.OUT_OF_STOCK, 0, name(item)));
+                return;
             }
             quantity = item.stock();
         }
@@ -88,7 +104,8 @@ public final class TransactionService {
         if (unit > 0) {
             int affordable = (int) Math.floor(balance / unit);
             if (affordable <= 0) {
-                return new Outcome(Result.NOT_ENOUGH_MONEY, balance, name(item));
+                callback.accept(new Outcome(Result.NOT_ENOUGH_MONEY, balance, name(item)));
+                return;
             }
             quantity = Math.min(quantity, affordable);
         }
@@ -96,76 +113,105 @@ public final class TransactionService {
         double total = round(unit * quantity);
 
         if (!currency.has(player, total) || !currency.withdraw(player, total)) {
-            return new Outcome(Result.NOT_ENOUGH_MONEY, currency.balance(player), name(item));
+            callback.accept(new Outcome(Result.NOT_ENOUGH_MONEY, currency.balance(player), name(item)));
+            return;
         }
 
-        if (shared) {
-            var db = plugin.transactionLog().database();
-            var reserved = db.reserveBuy(item.shopId(), item.itemId(), item.maxStock(),
-                    player.getUniqueId().toString(), java.time.LocalDate.now().toString(), item.key(),
-                    item.isLimited() ? item.limit() : 0, quantity);
-            if (reserved.granted() < 0) {
-                currency.deposit(player, total);
-                return new Outcome(Result.ERROR, 0, name(item));
-            }
-            if (reserved.granted() <= 0) {
-                currency.deposit(player, total);
-                Result result = item.isLimitedStock() && reserved.stock() <= 0
-                        ? Result.OUT_OF_STOCK : Result.LIMIT_REACHED;
-                return new Outcome(result, total, name(item));
-            }
-            if (reserved.granted() < quantity) {
-                // 别的服先把库存/限购买走了，退还多扣的钱
-                currency.deposit(player, round(unit * (quantity - reserved.granted())));
-                quantity = reserved.granted();
-                total = round(unit * quantity);
-            }
-            plugin.stocks().applyReservation(item, reserved.stock(), reserved.stockSold());
-            if (item.isLimited()) {
-                plugin.limits().applyBought(player.getUniqueId(), item, reserved.limitValue());
-            }
-        } else {
+        if (!shared) {
             if (!item.takeStock(quantity)) {
                 currency.deposit(player, total);
-                return new Outcome(Result.OUT_OF_STOCK, 0, name(item));
+                callback.accept(new Outcome(Result.OUT_OF_STOCK, 0, name(item)));
+                return;
             }
             item.addSold(quantity);
             plugin.limits().add(player.getUniqueId(), item, quantity);
             plugin.stocks().saveItem(item);
+
+            give(player, item, quantity);
+            plugin.transactionLog().record(player, shop.id(), item, name(item),
+                    item.currencyId(), true, quantity, unit, total);
+            callback.accept(new Outcome(Result.SUCCESS, total, name(item)));
+            return;
         }
 
-        give(player, item, quantity);
-        // 记录交易日志
-        plugin.transactionLog().record(player, shop.id(), item, name(item),
-                item.currencyId(), true, quantity, unit, total);
-        return new Outcome(Result.SUCCESS, total, name(item));
+        final int wanted = quantity;
+        final double unitPrice = unit;
+        final double paid = total;
+        var db = plugin.transactionLog().database();
+        var uuid = player.getUniqueId().toString();
+        var day = java.time.LocalDate.now().toString();
+        var limit = item.isLimited() ? item.limit() : 0;
+
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            var reserved = db.reserveBuy(item.shopId(), item.itemId(), item.maxStock(),
+                    uuid, day, item.key(), limit, wanted);
+
+            runSync(() -> {
+                int granted = reserved.granted();
+                if (granted < 0) {
+                    currency.deposit(player, paid);
+                    callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+                    return;
+                }
+                if (granted <= 0) {
+                    currency.deposit(player, paid);
+                    Result result = item.isLimitedStock() && reserved.stock() <= 0
+                            ? Result.OUT_OF_STOCK : Result.LIMIT_REACHED;
+                    callback.accept(new Outcome(result, paid, name(item)));
+                    return;
+                }
+
+                double finalTotal = paid;
+                if (granted < wanted) {
+                    // 别的服先把库存/限购买走了，退还多扣的钱
+                    currency.deposit(player, round(unitPrice * (wanted - granted)));
+                    finalTotal = round(unitPrice * granted);
+                }
+
+                plugin.stocks().applyReservation(item, reserved.stock(), reserved.stockSold());
+                if (item.isLimited()) {
+                    plugin.limits().applyBought(player.getUniqueId(), item, reserved.limitValue());
+                }
+
+                give(player, item, granted);
+                plugin.transactionLog().record(player, shop.id(), item, name(item),
+                        item.currencyId(), true, granted, unitPrice, finalTotal);
+                callback.accept(new Outcome(Result.SUCCESS, finalTotal, name(item)));
+            });
+        });
     }
 
-    // ================================================================
-    //  卖出
-    // ================================================================
-
     /**
-     * @param quantity 卖几个
+     * 卖出。跨服库存事务同样异步执行。
      */
-    public @NotNull Outcome sell(@NotNull Player player, @NotNull Shop shop, @NotNull ShopItem item, int quantity) {
+    public void sell(
+            @NotNull Player player,
+            @NotNull Shop shop,
+            @NotNull ShopItem item,
+            int quantity,
+            @NotNull Consumer<Outcome> callback
+    ) {
         if (quantity <= 0) {
-            return new Outcome(Result.ERROR, 0, name(item));
+            callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+            return;
         }
         if (!allowed(player, shop, item)) {
-            return new Outcome(Result.NO_PERMISSION, 0, name(item));
+            callback.accept(new Outcome(Result.NO_PERMISSION, 0, name(item)));
+            return;
         }
 
         Currency currency = plugin.currencies().getOrDefault(item.currencyId());
         if (currency == null || !currency.available() || !currency.supportsDeposit()) {
-            return new Outcome(Result.NO_CURRENCY, 0, name(item));
+            callback.accept(new Outcome(Result.NO_CURRENCY, 0, name(item)));
+            return;
         }
 
         // 每日限卖（按价格自动分档）
         if (item.isSellLimited()) {
             long left = plugin.limits().sellRemaining(player.getUniqueId(), item);
             if (left <= 0) {
-                return new Outcome(Result.SELL_LIMIT_REACHED, item.sellLimit(), name(item));
+                callback.accept(new Outcome(Result.SELL_LIMIT_REACHED, item.sellLimit(), name(item)));
+                return;
             }
             quantity = (int) Math.min(quantity, left);
         }
@@ -174,7 +220,8 @@ public final class TransactionService {
         int has = count(player, item.material());
         if (has < quantity) {
             if (has <= 0) {
-                return new Outcome(Result.NOT_ENOUGH_ITEMS, 0, name(item));
+                callback.accept(new Outcome(Result.NOT_ENOUGH_ITEMS, 0, name(item)));
+                return;
             }
             quantity = has;
         }
@@ -185,56 +232,89 @@ public final class TransactionService {
         int removed = take(player, item.material(), quantity);
         if (removed < quantity) {
             giveRaw(player, new ItemStack(item.material(), removed));
-            return new Outcome(Result.NOT_ENOUGH_ITEMS, has, name(item));
+            callback.accept(new Outcome(Result.NOT_ENOUGH_ITEMS, has, name(item)));
+            return;
         }
 
         boolean shared = plugin.transactionLog().database().shared();
-        if (shared) {
-            // 先到账，再原子占用限卖额度；失败就把钱扣回来、物品还给玩家
+        if (!shared) {
             if (!currency.deposit(player, total)) {
                 giveRaw(player, new ItemStack(item.material(), quantity));
-                return new Outcome(Result.ERROR, 0, name(item));
-            }
-            var db = plugin.transactionLog().database();
-            var reserved = db.reserveSell(item.shopId(), item.itemId(), item.maxStock(),
-                    player.getUniqueId().toString(), java.time.LocalDate.now().toString(), item.key(),
-                    item.isSellLimited() ? item.sellLimit() : 0, quantity);
-            if (reserved.granted() < 0) {
-                giveRaw(player, new ItemStack(item.material(), quantity));
-                currency.withdraw(player, total);
-                return new Outcome(Result.ERROR, 0, name(item));
-            }
-            if (reserved.granted() <= 0) {
-                giveRaw(player, new ItemStack(item.material(), quantity));
-                currency.withdraw(player, total);
-                return new Outcome(Result.SELL_LIMIT_REACHED, item.sellLimit(), name(item));
-            }
-            if (reserved.granted() < quantity) {
-                // 别的服先把限卖额度用掉了，把多扣的物品和钱还回去
-                int unused = quantity - reserved.granted();
-                giveRaw(player, new ItemStack(item.material(), unused));
-                currency.withdraw(player, round(unit * unused));
-                quantity = reserved.granted();
-                total = round(unit * quantity);
-            }
-            plugin.stocks().applyReservation(item, reserved.stock(), reserved.stockSold());
-            if (item.isSellLimited()) {
-                plugin.limits().applySold(player.getUniqueId(), item, reserved.limitValue());
-            }
-        } else {
-            if (!currency.deposit(player, total)) {
-                giveRaw(player, new ItemStack(item.material(), quantity));
-                return new Outcome(Result.ERROR, 0, name(item));
+                callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+                return;
             }
             item.giveStock(quantity);
             item.addSold(quantity);
             plugin.limits().addSell(player.getUniqueId(), item, quantity);
             plugin.stocks().saveItem(item);
+            plugin.transactionLog().record(player, shop.id(), item, name(item),
+                    item.currencyId(), false, quantity, unit, total);
+            callback.accept(new Outcome(Result.SUCCESS, total, name(item)));
+            return;
         }
-        // 记录交易日志
-        plugin.transactionLog().record(player, shop.id(), item, name(item),
-                item.currencyId(), false, quantity, unit, total);
-        return new Outcome(Result.SUCCESS, total, name(item));
+
+        // 跨服：先到账，异步占用限卖额度；失败就把钱扣回来、物品还给玩家
+        if (!currency.deposit(player, total)) {
+            giveRaw(player, new ItemStack(item.material(), quantity));
+            callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+            return;
+        }
+
+        final int wanted = quantity;
+        final double unitPrice = unit;
+        final double paid = total;
+        var db = plugin.transactionLog().database();
+        var uuid = player.getUniqueId().toString();
+        var day = java.time.LocalDate.now().toString();
+        var sellLimit = item.isSellLimited() ? item.sellLimit() : 0;
+
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            var reserved = db.reserveSell(item.shopId(), item.itemId(), item.maxStock(),
+                    uuid, day, item.key(), sellLimit, wanted);
+
+            runSync(() -> {
+                int granted = reserved.granted();
+                if (granted < 0) {
+                    giveRaw(player, new ItemStack(item.material(), wanted));
+                    currency.withdraw(player, paid);
+                    callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+                    return;
+                }
+                if (granted <= 0) {
+                    giveRaw(player, new ItemStack(item.material(), wanted));
+                    currency.withdraw(player, paid);
+                    callback.accept(new Outcome(Result.SELL_LIMIT_REACHED, item.sellLimit(), name(item)));
+                    return;
+                }
+
+                double finalTotal = paid;
+                if (granted < wanted) {
+                    // 别的服先把限卖额度用掉了，把多扣的物品和钱还回去
+                    int unused = wanted - granted;
+                    giveRaw(player, new ItemStack(item.material(), unused));
+                    currency.withdraw(player, round(unitPrice * unused));
+                    finalTotal = round(unitPrice * granted);
+                }
+
+                plugin.stocks().applyReservation(item, reserved.stock(), reserved.stockSold());
+                if (item.isSellLimited()) {
+                    plugin.limits().applySold(player.getUniqueId(), item, reserved.limitValue());
+                }
+
+                plugin.transactionLog().record(player, shop.id(), item, name(item),
+                        item.currencyId(), false, granted, unitPrice, finalTotal);
+                callback.accept(new Outcome(Result.SUCCESS, finalTotal, name(item)));
+            });
+        });
+    }
+
+    /** 把异步结果切回主线程；插件已关闭时直接忽略 */
+    private void runSync(@NotNull Runnable task) {
+        try {
+            Bukkit.getScheduler().runTask(plugin, task);
+        } catch (Throwable t) {
+            plugin.getLogger().warning("交易结果无法回到主线程：" + t.getMessage());
+        }
     }
 
     // ================================================================

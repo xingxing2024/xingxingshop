@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 商店界面。
@@ -57,6 +58,9 @@ public final class ShopView implements InventoryHolder {
     private final TransactionService transactions;
 
     private final Map<Integer, ShopItem> slotItems = new HashMap<>();
+
+    /** 防止跨服异步交易期间重复点击 */
+    private final AtomicBoolean trading = new AtomicBoolean();
 
     private int page = 1;
     private int totalPages = 1;
@@ -471,12 +475,32 @@ public final class ShopView implements InventoryHolder {
      * 真正执行交易并刷新界面
      */
     public void trade(@NotNull ShopItem item, int quantity, boolean selling) {
-        var outcome = selling
-                ? transactions.sell(viewer, shop, item, quantity)
-                : transactions.buy(viewer, shop, item, quantity);
-        transactions.notify(viewer, outcome, item, selling);
-        plugin.stocks().save();
-        render();
+        if (!trading.compareAndSet(false, true)) {
+            return;
+        }
+
+        java.util.function.Consumer<TransactionService.Outcome> done = outcome -> {
+            try {
+                transactions.notify(viewer, outcome, item, selling);
+                plugin.stocks().save();
+                if (viewer.getOpenInventory().getTopInventory().getHolder() == this) {
+                    render();
+                }
+            } finally {
+                trading.set(false);
+            }
+        };
+
+        try {
+            if (selling) {
+                transactions.sell(viewer, shop, item, quantity, done);
+            } else {
+                transactions.buy(viewer, shop, item, quantity, done);
+            }
+        } catch (Throwable t) {
+            trading.set(false);
+            plugin.getLogger().warning("执行交易失败：" + t.getMessage());
+        }
     }
 
     // ================================================================
