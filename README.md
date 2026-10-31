@@ -72,7 +72,7 @@
 | 项目 | 要求 |
 |---|---|
 | 服务端 | Paper / Purpur 26.x（26.3 实测通过） |
-| Java | 21+ |
+| Java | 25+ |
 | 必需 | Vault + 任意经济插件 |
 | 可选 | PlayerPoints、PlaceholderAPI |
 
