@@ -167,11 +167,13 @@ public final class ShopView implements InventoryHolder {
                 "&e返回主菜单", "&7查看全部分类"));
 
         int cartKinds = plugin.cart().items(viewer.getUniqueId()).size();
-        inventory.setItem(CONTROL + 2, GuiStyle.glow(button(Material.CHEST_MINECART,
-                "&b&l购物车",
-                "&7已选 &f" + cartKinds + " &7种商品",
-                "",
-                "&b➤ 点击查看并结算")));
+        if (!selling) {
+            inventory.setItem(CONTROL + 2, GuiStyle.glow(button(Material.CHEST_MINECART,
+                    "&b&l购物车",
+                    "&7已选 &f" + cartKinds + " &7种商品",
+                    "",
+                    "&b➤ 点击查看并结算")));
+        }
 
         if (page > 1) {
             inventory.setItem(CONTROL + 3, button(Material.ARROW,
@@ -424,7 +426,11 @@ public final class ShopView implements InventoryHolder {
         switch (slot) {
             case CONTROL, CONTROL + 7 -> render();
             case CONTROL + 1 -> plugin.gui().openEntry(viewer);
-            case CONTROL + 2 -> plugin.gui().openCart(viewer);
+            case CONTROL + 2 -> {
+                if (shop.type() == Shop.Type.BUY) {
+                    plugin.gui().openCart(viewer);
+                }
+            }
             case CONTROL + 3 -> {
                 if (page > 1) {
                     page--;
@@ -479,8 +485,12 @@ public final class ShopView implements InventoryHolder {
             // Shift+左键 / 中键：聊天框输入数量
             case SHIFT_LEFT, MIDDLE, NUMBER_KEY, DROP ->
                     plugin.chatInput().request(viewer, shop, item);
-            // F 键：加入购物车
-            case SWAP_OFFHAND -> addToCart(item);
+            // F 键：仅购买商店支持加入购物车
+            case SWAP_OFFHAND -> {
+                if (!selling) {
+                    addToCart(item);
+                }
+            }
             // Shift+右键：收藏 / 取消收藏
             case SHIFT_RIGHT -> toggleFavorite(item);
             default -> plugin.gui().openConfirm(viewer, shop, item, 1, selling);
@@ -489,7 +499,6 @@ public final class ShopView implements InventoryHolder {
 
     private void addToCart(@NotNull ShopItem item) {
         if (shop.type() != Shop.Type.BUY) {
-            viewer.sendMessage(Text.color("&c收购商店只能出售，不能加入购物车"));
             return;
         }
         if (item.isLimitedStock() && item.stock() <= 0) {

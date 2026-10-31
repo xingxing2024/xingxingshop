@@ -117,10 +117,12 @@ public final class CartMenu implements InventoryHolder {
                     Text.color("&7商店 &f" + line.shop.name()),
                     Text.color("&8" + "▬".repeat(10)),
                     Text.color("&7单价 &f" + money(currency, unit)),
-                    Text.color("&7数量 &f" + line.quantity + " &8(右键 -1)"),
+                    Text.color("&7数量 &f" + line.quantity),
                     Text.color("&7小计 &e" + money(currency, total)),
                     Text.color("&8" + "▬".repeat(10)),
-                    Text.color("&c左键 &7移除这一项")
+                    Text.color("&e左键 &7设置数量"),
+                    Text.color("&e右键 &7数量 -1"),
+                    Text.color("&cQ &7移除这一项")
             ));
             stack.setItemMeta(meta);
         }
@@ -169,13 +171,21 @@ public final class CartMenu implements InventoryHolder {
                 return;
             }
             Line line = lines.get(index);
+            if (click == ClickType.DROP) {
+                plugin.cart().remove(viewer.getUniqueId(), line.item.key());
+                Sounds.play(viewer, "click");
+                render();
+                return;
+            }
             if (click.isRightClick()) {
                 plugin.cart().remove(viewer.getUniqueId(), line.item.key(), 1);
-            } else {
-                plugin.cart().remove(viewer.getUniqueId(), line.item.key());
+                Sounds.play(viewer, "click");
+                render();
+                return;
             }
-            Sounds.play(viewer, "click");
-            render();
+            if (click.isLeftClick()) {
+                plugin.chatInput().requestCartQuantity(viewer, line.shop, line.item);
+            }
         }
     }
 

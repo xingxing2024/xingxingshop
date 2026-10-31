@@ -428,10 +428,6 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Text.color("&a已从购物车移除 " + item.displayName()));
             return true;
         }
-        if (sub.equals("add")) {
-            sender.sendMessage(Text.color("&c请在商店里按 F 键加入购物车"));
-            return true;
-        }
         if (!sub.equals("buy")) {
             sender.sendMessage(Text.color("&c用法：/shop cart <remove|list|clear|buy>"));
             return true;

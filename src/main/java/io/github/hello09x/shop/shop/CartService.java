@@ -51,6 +51,17 @@ public final class CartService {
             return 0;
         }
 
+        // 安全锁：价格为 0 或无效时整单取消，避免 0 元结算
+        for (Line line : lines) {
+            double unit = line.item.buyPrice(player);
+            double total = unit * line.quantity;
+            if (!Double.isFinite(unit) || !Double.isFinite(total) || total <= 0) {
+                player.sendMessage(Text.color("&c结算已取消：&f" + line.item.displayName()
+                        + " &c的价格为 0 或无效，请联系管理员检查商店配置"));
+                return 0;
+            }
+        }
+
         // 先清空，防止结算期间重复点击
         plugin.cart().clear(uuid);
         var transactions = new TransactionService(plugin);
@@ -95,15 +106,19 @@ public final class CartService {
     }
 
     private void finish(Player player, int success, List<String> failures) {
+        var currency = plugin.currencies().getOrDefault(null);
+        String balance = currency == null ? ""
+                : " &8| &7余额 &f" + currency.format(currency.balance(player));
         if (failures.isEmpty()) {
-            player.sendMessage(Text.color("&a[商店] 结算完成：成功购买 &f" + success + " &a件商品"));
+            player.sendMessage(Text.color("&a[商店] 结算完成：成功购买 &f" + success
+                    + " &a件商品" + balance));
         } else {
             String detail = String.join("、", failures.subList(0, Math.min(3, failures.size())));
             if (failures.size() > 3) {
                 detail += " 等 " + failures.size() + " 件";
             }
             player.sendMessage(Text.color("&e[商店] 结算完成：&a成功 " + success
-                    + " &7/ &c失败 " + failures.size() + " &8- &f" + detail));
+                    + " &7/ &c失败 " + failures.size() + " &8- &f" + detail + balance));
         }
         Sounds.play(player, success > 0 ? "buy-success" : "error");
     }

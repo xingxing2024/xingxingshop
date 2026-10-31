@@ -24,6 +24,12 @@ public final class CartStore {
         return cart == null ? Map.of() : new LinkedHashMap<>(cart);
     }
 
+    /** 直接设置某项数量 */
+    public void set(@NotNull UUID player, @NotNull String itemKey, int quantity) {
+        carts.computeIfAbsent(player, k -> new LinkedHashMap<>())
+                .put(itemKey, Math.min(100_000, Math.max(1, quantity)));
+    }
+
     public void clear(@NotNull UUID player) {
         carts.remove(player);
     }
