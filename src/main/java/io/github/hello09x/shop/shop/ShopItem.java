@@ -25,6 +25,8 @@ public final class ShopItem {
     private final Material material;
     /** 自定义物品原始模板（ItemsAdder / Nexo / MMOItems），null 表示原版物品 */
     private final @Nullable ItemStack customTemplate;
+    /** 自定义物品配置，如 itemsadder:ns:id */
+    private final @Nullable String customId;
 
     /** 单个买入价 */
     private final double buyPrice;
@@ -53,6 +55,7 @@ public final class ShopItem {
             @NotNull ItemStack display,
             @NotNull Material material,
             @Nullable ItemStack customTemplate,
+            @Nullable String customId,
             double buyPrice,
             @Nullable Double sellPrice,
             @Nullable String currencyId,
@@ -69,6 +72,7 @@ public final class ShopItem {
         this.display = display;
         this.material = material;
         this.customTemplate = customTemplate == null ? null : customTemplate.clone();
+        this.customId = customId;
         this.buyPrice = buyPrice;
         this.sellPrice = sellPrice;
         this.currencyId = currencyId;
@@ -321,7 +325,7 @@ public final class ShopItem {
             return false;
         }
         if (customTemplate != null) {
-            return stack.isSimilar(customTemplate);
+            return CustomItems.matches(customId, customTemplate, stack);
         }
         return stack.getType() == material;
     }

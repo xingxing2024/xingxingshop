@@ -149,6 +149,52 @@ public final class CustomItems {
         return item instanceof ItemStack stack ? stack.clone() : null;
     }
 
+    /**
+     * 判断背包里的物品是不是配置的自定义物品。
+     *
+     * <p>优先用插件自己的 ID 判断；拿不到 API 时退回完整 ItemStack 比较。</p>
+     */
+    public static boolean matches(@Nullable String raw, @NotNull ItemStack template,
+                                  @Nullable ItemStack candidate) {
+        if (candidate == null || candidate.getType() == Material.AIR) {
+            return false;
+        }
+        if (raw != null) {
+            int split = raw.indexOf(':');
+            if (split > 0) {
+                String provider = raw.substring(0, split).toLowerCase(Locale.ROOT);
+                String id = raw.substring(split + 1).trim();
+                try {
+                    if (provider.equals("itemsadder") || provider.equals("ia")) {
+                        Class<?> stackClass = Class.forName("dev.lone.itemsadder.api.CustomStack");
+                        Object custom = stackClass.getMethod("byItemStack", ItemStack.class)
+                                .invoke(null, candidate);
+                        if (custom == null) {
+                            return false;
+                        }
+                        Object namespaced = stackClass.getMethod("getNamespacedID").invoke(custom);
+                        return namespaced instanceof String s && s.equalsIgnoreCase(id);
+                    } else if (provider.equals("nexo")) {
+                        Class<?> api = Class.forName("com.nexomc.nexo.api.NexoItems");
+                        Object found = api.getMethod("idFromItem", ItemStack.class).invoke(null, candidate);
+                        return found instanceof String s && s.equalsIgnoreCase(id);
+                    } else if (provider.equals("mmoitems") || provider.equals("mmo")) {
+                        Class<?> mmo = Class.forName("net.Indyuce.mmoitems.MMOItems");
+                        Object found = mmo.getMethod("getID", ItemStack.class).invoke(null, candidate);
+                        if (!(found instanceof String s)) {
+                            return false;
+                        }
+                        String wanted = id.contains(":") ? id.substring(id.indexOf(':') + 1) : id;
+                        return s.equalsIgnoreCase(wanted);
+                    }
+                } catch (Throwable ignored) {
+                    // 插件 API 版本不同，退回完整物品比较
+                }
+            }
+        }
+        return template.isSimilar(candidate);
+    }
+
     private static void warn(@NotNull String key, @NotNull String message) {
         if (!WARNED.add(key)) {
             return;

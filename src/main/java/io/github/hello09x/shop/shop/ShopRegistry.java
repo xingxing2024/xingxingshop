@@ -135,7 +135,7 @@ public final class ShopRegistry {
     private static boolean sameProduct(@NotNull ShopItem a, @NotNull ShopItem b) {
         if (a.isCustom() || b.isCustom()) {
             return a.isCustom() && b.isCustom()
-                    && a.reward(1).isSimilar(b.reward(1));
+                    && a.matches(b.reward(1));
         }
         return a.material() == b.material();
     }
@@ -291,7 +291,7 @@ public final class ShopRegistry {
                         s.getInt("custom-model-data", 0), s.getBoolean("glow", false));
 
         return new ShopItem(
-                shopId, itemId, display, material, customTemplate,
+                shopId, itemId, display, material, customTemplate, customId,
                 buyPrice,
                 sellPrice,
                 s.getString("currency"),
@@ -424,7 +424,7 @@ public final class ShopRegistry {
                 : material.name().toLowerCase(Locale.ROOT) + "_" + index;
 
         return new ShopItem(
-                shopId, itemId, display, material, customTemplate,
+                shopId, itemId, display, material, customTemplate, customId,
                 buyPrice,
                 sellPrice,
                 opts.get("currency"),

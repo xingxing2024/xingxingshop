@@ -335,6 +335,12 @@ public final class TransactionService {
     // ================================================================
 
     private boolean allowed(@NotNull Player player, @NotNull Shop shop, @NotNull ShopItem item) {
+        if (!player.hasPermission("xshop.use")) {
+            return false;
+        }
+        if (shop.type() == Shop.Type.SELL && !player.hasPermission("xshop.sell")) {
+            return false;
+        }
         if (shop.permission() != null && !player.hasPermission(shop.permission())) {
             return false;
         }
