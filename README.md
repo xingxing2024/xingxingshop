@@ -48,6 +48,7 @@
 - MySQL（跨服，多服共享）
 - 交易 / 库存 / 限购 / 日报投递记录全部入库
 - HikariCP 连接池，交易异步处理
+- SQLite / MySQL 驱动不打包，首次启动从阿里云按需下载
 - 跨服库存事务原子扣减，不会超卖
 - 商店配置可通过数据库同步到其他服
 - 数据库表前缀，支持多插件共库
@@ -76,7 +77,7 @@
 1. 服务端：**Paper / Purpur 1.20.6 ~ 26.x**
 2. Java：**21+**
 3. 安装 **Vault** + 任意经济插件（EssentialsX / CMI / XConomy 等）
-4. 把 `XingXingShop-1.0.7.jar` 放进 `plugins/`
+4. 把 `XingXingShop-1.0.8.jar` 放进 `plugins/`
 5. 启动服务器
 
 首次启动会自动释放：
@@ -283,7 +284,7 @@ mvn clean package
 产物：
 
 ```text
-target/XingXingShop-1.0.7.jar
+target/XingXingShop-1.0.8.jar
 ```
 
 ---
@@ -293,4 +294,5 @@ target/XingXingShop-1.0.7.jar
 [Apache-2.0](LICENSE)
 
 如果这个插件对你有帮助，欢迎 Star ⭐
+
 
