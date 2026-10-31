@@ -25,6 +25,7 @@ public final class ShopGuiManager {
             plugin.messages().send(viewer, "shop-closed");
             return;
         }
+        io.github.hello09x.shop.util.Sounds.play(viewer, "open");
         ShopView view = new ShopView(plugin, shop, viewer);
         viewer.openInventory(view.getInventory());
     }
@@ -34,6 +35,7 @@ public final class ShopGuiManager {
             plugin.messages().send(viewer, "shop-closed");
             return;
         }
+        io.github.hello09x.shop.util.Sounds.play(viewer, "open");
         ShopView view = new ShopView(plugin, shop, viewer);
         view.page(page);
         view.render();
@@ -53,17 +55,20 @@ public final class ShopGuiManager {
 
     /** 管理员交易记录面板 */
     public void openTransactions(@NotNull Player viewer, int page) {
+        io.github.hello09x.shop.util.Sounds.play(viewer, "open");
         TransactionMenu menu = new TransactionMenu(plugin, viewer, page);
         viewer.openInventory(menu.getInventory());
     }
 
     /** 管理员商品编辑面板 */
     public void openEdit(@NotNull Player viewer, @NotNull Shop shop, @NotNull ShopItem item) {
+        io.github.hello09x.shop.util.Sounds.play(viewer, "open");
         AdminItemMenu menu = new AdminItemMenu(plugin, shop, item, viewer);
         viewer.openInventory(menu.getInventory());
     }
 
     public void openSearch(@NotNull Player viewer, @NotNull String keyword) {
+        io.github.hello09x.shop.util.Sounds.play(viewer, "open");
         SearchMenu menu = new SearchMenu(plugin, viewer, keyword);
         viewer.openInventory(menu.getInventory());
     }
@@ -95,19 +100,20 @@ public final class ShopGuiManager {
             plugin.messages().send(viewer, "no-shops");
             return;
         }
-        io.github.hello09x.shop.util.Sounds.play(viewer, "open");
         if (shops.size() == 1) {
             open(viewer, shops.get(0));
             return;
         }
         ShopListMenu menu = new ShopListMenu(plugin, viewer, type);
         viewer.openInventory(menu.getInventory());
+        io.github.hello09x.shop.util.Sounds.play(viewer, "open");
     }
 
-    /** 打开某一类的分类列表（不重播打开音效） */
+    /** 打开某一类的分类列表 */
     public void openList(@NotNull Player viewer, @NotNull Shop.Type type) {
         ShopListMenu menu = new ShopListMenu(plugin, viewer, type);
         viewer.openInventory(menu.getInventory());
+        io.github.hello09x.shop.util.Sounds.play(viewer, "open");
     }
 
     public static @Nullable ShopListMenu asList(@Nullable InventoryHolder holder) {
