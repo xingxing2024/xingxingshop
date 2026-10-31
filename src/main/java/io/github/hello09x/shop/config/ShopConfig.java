@@ -25,6 +25,8 @@ public final class ShopConfig {
     private double dynamicCoefficient = 0.5;
     private double dynamicMin = 0.3;
     private double dynamicMax = 3.0;
+    private String dynamicFormula = "linear";
+    private int dynamicSteps = 5;
 
     /** 是否启用每日限卖（收购菜单） */
     private boolean sellLimits = true;
@@ -88,6 +90,8 @@ public final class ShopConfig {
         this.dynamicMin = clampNonNegative(f.getDouble("dynamic.min", 0.3), 0.3);
         this.dynamicMax = Math.max(1, Math.max(dynamicMin,
                 clampNonNegative(f.getDouble("dynamic.max", 3.0), 3.0)));
+        this.dynamicFormula = f.getString("dynamic.formula", "linear");
+        this.dynamicSteps = Math.max(1, Math.min(100, f.getInt("dynamic.steps", 5)));
         this.sellLimits = f.getBoolean("sell-limits", true);
         this.antiArbitrage = f.getBoolean("anti-arbitrage", true);
         this.metrics = f.getBoolean("metrics.enabled", true);
@@ -281,6 +285,14 @@ public final class ShopConfig {
 
     public double dynamicMax() {
         return dynamicMax;
+    }
+
+    public String dynamicFormula() {
+        return dynamicFormula;
+    }
+
+    public int dynamicSteps() {
+        return dynamicSteps;
     }
 
     public int rows() {

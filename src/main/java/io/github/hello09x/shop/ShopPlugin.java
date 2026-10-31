@@ -13,6 +13,7 @@ import io.github.hello09x.shop.log.DailyReport;
 import io.github.hello09x.shop.log.ReportDeliveryStore;
 import io.github.hello09x.shop.log.TransactionLog;
 import io.github.hello09x.shop.shop.ShopRegistry;
+import io.github.hello09x.shop.storage.CartStore;
 import io.github.hello09x.shop.storage.FavoriteStore;
 import io.github.hello09x.shop.storage.ShopSync;
 import io.github.hello09x.shop.storage.StockStore;import io.github.hello09x.shop.util.Messages;
@@ -45,6 +46,7 @@ public final class ShopPlugin extends JavaPlugin {
     private LimitStore limits;
     private FavoriteStore favorites;
     private ShopSync shopSync;
+    private final CartStore cart = new CartStore();
     private ShopGuiManager gui;
     private ChatInputHandler chatInput;
     private TransactionLog transactionLog;
@@ -590,6 +592,10 @@ public final class ShopPlugin extends JavaPlugin {
 
     public ShopSync shopSync() {
         return shopSync;
+    }
+
+    public CartStore cart() {
+        return cart;
     }
 
     public ShopGuiManager gui() {

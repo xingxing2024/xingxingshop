@@ -30,7 +30,7 @@ public final class ShopItem {
     private final @Nullable String customId;
 
     /** 单个买入价 */
-    private final double buyPrice;
+    private double buyPrice;
     /** 单个卖出价；{@code null} 表示按全局 sell-ratio 计算 */
     private Double sellPrice;
     private final String currencyId;
@@ -59,6 +59,8 @@ public final class ShopItem {
     private final int restockAmount;
     /** 自动补货间隔（秒），0 = 不补 */
     private final int restockInterval;
+    /** 预计下次补货时间戳，0 = 未知 */
+    private volatile long nextRestockAt;
 
     private volatile int stock;
     private volatile int sold;
@@ -125,7 +127,7 @@ public final class ShopItem {
         }
         int base = Math.max(1, maxStock);
         double ratio = (double) (base - stock) / base;
-        double multiplier = 1 + ratio * ShopPlugin.getInstance().config().dynamicCoefficient();
+        double multiplier = dynamicMultiplier(ratio);
         return round(buyPrice * clamp(multiplier));
     }
 
@@ -166,6 +168,14 @@ public final class ShopItem {
         return restockAmount > 0 && restockInterval > 0 && maxStock > 0;
     }
 
+    public long nextRestockAt() {
+        return nextRestockAt;
+    }
+
+    public void nextRestockAt(long value) {
+        this.nextRestockAt = value;
+    }
+
     private double discountMultiplier() {
         if (discount >= 1 || discount <= 0) {
             return 1;
@@ -183,6 +193,14 @@ public final class ShopItem {
     /** 基础买入单价（配置里写的） */
     public double baseBuyPrice() {
         return buyPrice;
+    }
+
+    public void setBaseBuyPrice(double price) {
+        this.buyPrice = Math.max(0, price);
+    }
+
+    public void setSellPrice(@Nullable Double price) {
+        this.sellPrice = price == null ? null : Math.max(0, price);
     }
 
     /** 可能的最低买入价（含 VIP 价 / 折扣），用于防低买高卖 */
@@ -245,8 +263,22 @@ public final class ShopItem {
         if (!isDynamicActive()) {
             return 1;
         }
+        return Math.max(1, Math.min(dynamicMultiplier(1), ShopPlugin.getInstance().config().dynamicMax()));
+    }
+
+    private double dynamicMultiplier(double ratio) {
         var cfg = ShopPlugin.getInstance().config();
-        return Math.max(1, Math.min(1 + cfg.dynamicCoefficient(), cfg.dynamicMax()));
+        double coefficient = cfg.dynamicCoefficient();
+        String formula = cfg.dynamicFormula();
+        if (formula != null && formula.equalsIgnoreCase("exponential")) {
+            return Math.pow(1 + coefficient, Math.max(0, ratio));
+        }
+        if (formula != null && formula.equalsIgnoreCase("step")) {
+            int steps = Math.max(1, cfg.dynamicSteps());
+            double step = Math.ceil(Math.max(0, ratio) * steps) / steps;
+            return 1 + step * coefficient;
+        }
+        return 1 + Math.max(0, ratio) * coefficient;
     }
 
     /** 收购价是否因为卖太多而下跌 */

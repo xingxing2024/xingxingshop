@@ -141,6 +141,9 @@ public final class TransactionService {
             item.addSold(quantity);
             plugin.limits().add(player.getUniqueId(), item, quantity);
             plugin.stocks().saveItem(item);
+            if (item.isLimitedStock() && item.stock() <= 0) {
+                plugin.stocks().notifySoldOut(item);
+            }
 
             give(player, item, quantity);
             plugin.transactionLog().record(player, shop.id(), item, name(item),
@@ -186,6 +189,9 @@ public final class TransactionService {
                     }
 
                     plugin.stocks().applyReservation(item, reserved.stock(), reserved.stockSold());
+                    if (item.isLimitedStock() && reserved.stock() <= 0) {
+                        plugin.stocks().notifySoldOut(item);
+                    }
                     if (item.isLimited()) {
                         plugin.limits().applyBought(player.getUniqueId(), item, reserved.limitValue());
                     }

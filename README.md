@@ -77,7 +77,7 @@
 1. 服务端：**Paper / Purpur 1.20.6 ~ 26.x**
 2. Java：**21+**
 3. 安装 **Vault** + 任意经济插件（EssentialsX / CMI / XConomy 等）
-4. 把 `XingXingShop-1.0.8.jar` 放进 `plugins/`
+4. 把 `XingXingShop-1.0.9.jar` 放进 `plugins/`
 5. 启动服务器
 
 首次启动会自动释放：
@@ -287,7 +287,7 @@ mvn clean package
 产物：
 
 ```text
-target/XingXingShop-1.0.8.jar
+target/XingXingShop-1.0.9.jar
 ```
 
 ---
@@ -297,5 +297,6 @@ target/XingXingShop-1.0.8.jar
 [Apache-2.0](LICENSE)
 
 如果这个插件对你有帮助，欢迎 Star ⭐
+
 
 

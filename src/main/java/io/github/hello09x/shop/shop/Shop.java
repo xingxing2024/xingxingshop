@@ -27,6 +27,9 @@ public final class Shop {
     private final List<String> desc;
     private final String permission;
     private final Type type;
+    /** 活动商店开始 / 结束时间戳，0 = 不限 */
+    private final long openFrom;
+    private final long openTo;
 
     private final List<ShopItem> items = new ArrayList<>();
 
@@ -36,7 +39,9 @@ public final class Shop {
             @NotNull Material icon,
             @NotNull List<String> desc,
             @Nullable String permission,
-            @NotNull Type type
+            @NotNull Type type,
+            long openFrom,
+            long openTo
     ) {
         this.id = id;
         this.name = name;
@@ -44,6 +49,8 @@ public final class Shop {
         this.desc = desc;
         this.permission = permission;
         this.type = type;
+        this.openFrom = openFrom;
+        this.openTo = openTo;
     }
 
     public void addItem(@NotNull ShopItem item) {
@@ -91,6 +98,20 @@ public final class Shop {
 
     public @NotNull Type type() {
         return type;
+    }
+
+    /** 活动商店是否在开放时间内 */
+    public boolean isOpen() {
+        long now = System.currentTimeMillis();
+        return (openFrom <= 0 || now >= openFrom) && (openTo <= 0 || now < openTo);
+    }
+
+    public long openFrom() {
+        return openFrom;
+    }
+
+    public long openTo() {
+        return openTo;
     }
 
     public @NotNull List<ShopItem> items() {

@@ -123,6 +123,7 @@ public final class MainMenu implements InventoryHolder {
 
     private List<Shop> visible(Shop.Type type) {
         return plugin.shops().byType(type).stream()
+                .filter(s -> s.isOpen())
                 .filter(s -> s.permission() == null || viewer.hasPermission(s.permission()))
                 .toList();
     }

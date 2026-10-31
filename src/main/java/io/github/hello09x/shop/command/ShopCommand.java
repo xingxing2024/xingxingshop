@@ -135,6 +135,12 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             case "info" -> {
                 return info(sender, args);
             }
+            case "edit" -> {
+                return edit(sender, args);
+            }
+            case "cart" -> {
+                return cart(sender, args);
+            }
             default -> {
                 // /shop <分类id>
                 return openMenu(sender, null, args[0]);
@@ -174,6 +180,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
         out.add("    &f/shop search &e<关键词> &8» &7搜索商品");
         out.add("    &f/shop recent &8» &7最近 10 笔购买");
         out.add("    &f/shop fav &e[add|remove|list] [分类] [商品] &8» &7收藏商品");
+        out.add("    &f/shop cart &e[add|remove|list|clear|buy] &8» &7购物车");
         out.add("    &f/shop myreport &e[today|yesterday|week|month] &8» &7我的交易日报");
         out.add("    &f/shop help &8» &7显示这份帮助");
         out.add("");
@@ -197,6 +204,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             out.add("    &f/shop price &e<分类> <商品id> <价格> &8» &7修改价格");
             out.add("    &f/shop stock &e<分类> <商品id> <库存> &8» &7修改库存");
             out.add("    &f/shop info &e<分类> <商品id> &8» &7查看商品详情");
+            out.add("    &f/shop edit &e<分类> <商品id> &8» &7图形化改价格 / 库存");
             out.add("    &f/shop log &e[玩家名] [页码] &8» &7查看交易记录");
             out.add("    &f/shop log gui &e[页码] &8» &7打开交易记录面板");
             out.add("    &f/shop report &e[today|yesterday|week|month|日期|list] &8» &7查看全服日报");
@@ -232,6 +240,10 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
                 plugin.messages().send(player, "shop-not-found", shopId);
                 return true;
             }
+            if (!shop.isOpen()) {
+                plugin.messages().send(player, "shop-closed");
+                return true;
+            }
             if (shop.permission() != null && !player.hasPermission(shop.permission())) {
                 plugin.messages().send(player, "no-permission");
                 return true;
@@ -256,10 +268,17 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
         String keyword = String.join(" ", java.util.Arrays.copyOfRange(args, 1, args.length))
                 .toLowerCase(java.util.Locale.ROOT);
         Player player = sender instanceof Player p ? p : null;
+        if (player != null) {
+            plugin.gui().openSearch(player, keyword);
+            return true;
+        }
         int limit = 20;
         int shown = 0;
         sender.sendMessage(Text.color("&8&m--------&r &6搜索 &f" + keyword + " &8&m--------"));
         for (Shop shop : plugin.shops().all().values()) {
+            if (!shop.isOpen()) {
+                continue;
+            }
             if (player != null && shop.permission() != null && !player.hasPermission(shop.permission())) {
                 continue;
             }
@@ -318,6 +337,10 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         String sub = args.length > 1 ? args[1].toLowerCase(java.util.Locale.ROOT) : "list";
+        if (sub.equals("gui")) {
+            plugin.gui().openFavorites(player);
+            return true;
+        }
         if (sub.equals("list")) {
             var list = plugin.favorites().list(player.getUniqueId());
             if (list.isEmpty()) {
@@ -363,6 +386,103 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(Text.color(removed ? "&a已取消收藏：" + item.displayName()
                     : "&7收藏夹里没有这个商品"));
         }
+        return true;
+    }
+
+    private boolean cart(@NotNull CommandSender sender, @NotNull String[] args) {
+        if (!(sender instanceof Player player)) {
+            plugin.messages().send(sender, "player-only");
+            return true;
+        }
+        String sub = args.length > 1 ? args[1].toLowerCase(java.util.Locale.ROOT) : "list";
+        if (sub.equals("list")) {
+            var items = plugin.cart().items(player.getUniqueId());
+            if (items.isEmpty()) {
+                sender.sendMessage(Text.color("&7购物车是空的"));
+                return true;
+            }
+            sender.sendMessage(Text.color("&8&m--------&r &6我的购物车 &8&m--------"));
+            for (var entry : items.entrySet()) {
+                int split = entry.getKey().indexOf(':');
+                Shop shop = split > 0 ? plugin.shops().get(entry.getKey().substring(0, split)) : null;
+                ShopItem item = shop == null ? null : shop.find(entry.getKey().substring(split + 1));
+                if (item != null) {
+                    sender.sendMessage(Text.color("&7[" + shop.name() + "] &f" + item.displayName()
+                            + " &7× &f" + entry.getValue()));
+                }
+            }
+            sender.sendMessage(Text.color("&7/shop cart buy &8» &a结算"));
+            return true;
+        }
+        if (sub.equals("clear")) {
+            plugin.cart().clear(player.getUniqueId());
+            sender.sendMessage(Text.color("&a购物车已清空"));
+            return true;
+        }
+        if (sub.equals("remove")) {
+            if (args.length < 4) {
+                sender.sendMessage(Text.color("&c用法：/shop cart remove <分类> <商品id>"));
+                return true;
+            }
+            Shop shop = plugin.shops().get(args[2]);
+            ShopItem item = shop == null ? null : shop.find(args[3]);
+            if (item == null) {
+                sender.sendMessage(Text.color("&c找不到商品"));
+                return true;
+            }
+            plugin.cart().remove(player.getUniqueId(), item.key());
+            sender.sendMessage(Text.color("&a已从购物车移除 " + item.displayName()));
+            return true;
+        }
+        if (sub.equals("add")) {
+            if (args.length < 4) {
+                sender.sendMessage(Text.color("&c用法：/shop cart add <分类> <商品id> [数量]"));
+                return true;
+            }
+            Shop shop = plugin.shops().get(args[2]);
+            ShopItem item = shop == null ? null : shop.find(args[3]);
+            if (shop == null || item == null) {
+                sender.sendMessage(Text.color("&c找不到商品"));
+                return true;
+            }
+            if (!shop.isOpen()) {
+                plugin.messages().send(sender, "shop-closed");
+                return true;
+            }
+            int quantity = 1;
+            if (args.length > 4) {
+                try {
+                    quantity = Math.max(1, Integer.parseInt(args[4]));
+                } catch (NumberFormatException ignored) {
+                    // 默认 1
+                }
+            }
+            plugin.cart().add(player.getUniqueId(), item.key(), quantity);
+            sender.sendMessage(Text.color("&a已加入购物车：" + item.displayName() + " × " + quantity));
+            return true;
+        }
+        if (!sub.equals("buy")) {
+            sender.sendMessage(Text.color("&c用法：/shop cart <add|remove|list|clear|buy>"));
+            return true;
+        }
+        var cart = plugin.cart().items(player.getUniqueId());
+        if (cart.isEmpty()) {
+            sender.sendMessage(Text.color("&7购物车是空的"));
+            return true;
+        }
+        var transactions = new io.github.hello09x.shop.shop.TransactionService(plugin);
+        for (var entry : cart.entrySet()) {
+            int split = entry.getKey().indexOf(':');
+            Shop shop = split > 0 ? plugin.shops().get(entry.getKey().substring(0, split)) : null;
+            ShopItem item = shop == null ? null : shop.find(entry.getKey().substring(split + 1));
+            if (item == null || !shop.isOpen()) {
+                continue;
+            }
+            transactions.buy(player, shop, item, entry.getValue(),
+                    outcome -> transactions.notify(player, outcome, item, false));
+        }
+        plugin.cart().clear(player.getUniqueId());
+        sender.sendMessage(Text.color("&a购物车结算中…"));
         return true;
     }
 
@@ -805,6 +925,32 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    private boolean edit(@NotNull CommandSender sender, @NotNull String[] args) {
+        if (!admin(sender)) {
+            return true;
+        }
+        if (!(sender instanceof Player player)) {
+            plugin.messages().send(sender, "player-only");
+            return true;
+        }
+        if (args.length < 3) {
+            sender.sendMessage(Text.color("&c用法：/shop edit <分类> <商品id>"));
+            return true;
+        }
+        Shop shop = plugin.shops().get(args[1]);
+        if (shop == null) {
+            plugin.messages().send(sender, "shop-not-found", args[1]);
+            return true;
+        }
+        ShopItem item = shop.find(args[2]);
+        if (item == null) {
+            sender.sendMessage(Text.color("&c找不到商品：" + args[2]));
+            return true;
+        }
+        plugin.gui().openEdit(player, shop, item);
+        return true;
+    }
+
     private boolean info(@NotNull CommandSender sender, @NotNull String[] args) {
         if (!admin(sender)) {
             return true;
@@ -874,7 +1020,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
     ) {
         List<String> out = new ArrayList<>();
         if (args.length == 1) {
-            out.addAll(List.of("help", "buy", "sell", "money", "myreport", "search", "recent", "fav"));
+            out.addAll(List.of("help", "buy", "sell", "money", "myreport", "search", "recent", "fav", "edit", "cart"));
             if (sender.hasPermission("xshop.admin")) {
                 out.addAll(List.of("list", "log", "report", "reload", "add", "remove", "price", "stock", "info"));
             }

@@ -634,7 +634,7 @@ public final class TransactionDatabase {
     // ================================================================
 
     /** 一行库存数据 */
-    public record StockRow(@NotNull String shopId, @NotNull String itemId, int stock, int sold) {
+    public record StockRow(@NotNull String shopId, @NotNull String itemId, int stock, int sold, long lastRestock) {
     }
 
     /**
@@ -685,14 +685,15 @@ public final class TransactionDatabase {
         try {
             conn = connection();
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT shop_id, item_id, stock, sold FROM " + table("shop_stock"));
+                    "SELECT shop_id, item_id, stock, sold, last_restock FROM " + table("shop_stock"));
                  ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     out.add(new StockRow(
                             rs.getString("shop_id"),
                             rs.getString("item_id"),
                             rs.getInt("stock"),
-                            rs.getInt("sold")));
+                            rs.getInt("sold"),
+                            rs.getLong("last_restock")));
                 }
             }
         } catch (SQLException e) {
@@ -714,13 +715,13 @@ public final class TransactionDatabase {
         try {
             conn = connection();
             try (PreparedStatement ps = conn.prepareStatement(
-                    "SELECT shop_id, item_id, stock, sold FROM " + table("shop_stock") + " WHERE shop_id = ? AND item_id = ?")) {
+                    "SELECT shop_id, item_id, stock, sold, last_restock FROM " + table("shop_stock") + " WHERE shop_id = ? AND item_id = ?")) {
                 ps.setString(1, shopId);
                 ps.setString(2, itemId);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         return new StockRow(rs.getString("shop_id"), rs.getString("item_id"),
-                                rs.getInt("stock"), rs.getInt("sold"));
+                                rs.getInt("stock"), rs.getInt("sold"), rs.getLong("last_restock"));
                     }
                 }
             }

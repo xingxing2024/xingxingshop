@@ -278,6 +278,10 @@ public final class ShopView implements InventoryHolder {
             String c = stock <= 0 ? "&c" : stock < 10 ? "&e" : "&a";
             lore.add(Text.color("&7库存 " + c + stock));
         }
+        if (item.hasRestock() && item.stock() < item.maxStock()) {
+            long left = item.nextRestockAt() - System.currentTimeMillis();
+            lore.add(Text.color("&7下次补货 &f" + (left <= 0 ? "即将" : formatRestock(left))));
+        }
         if (item.isDynamicActive()) {
             // 动态价格提示按商店类型区分
             if (selling) {
@@ -509,6 +513,17 @@ public final class ShopView implements InventoryHolder {
     }
 
     // ================================================================
+
+    private static @NotNull String formatRestock(long millis) {
+        long seconds = Math.max(1, (millis + 999) / 1000);
+        long h = seconds / 3600;
+        long m = (seconds % 3600) / 60;
+        long s = seconds % 60;
+        if (h > 0) {
+            return h + "h " + m + "m";
+        }
+        return String.format("%02d:%02d", m, s);
+    }
 
     @Override
     public @NotNull Inventory getInventory() {

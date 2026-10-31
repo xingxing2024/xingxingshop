@@ -35,7 +35,11 @@ public final class GuiListener implements Listener {
         ShopListMenu list = ShopGuiManager.asList(holder);
         ConfirmView confirm = ShopGuiManager.asConfirm(holder);
         TransactionMenu transactions = ShopGuiManager.asTransactions(holder);
-        if (view == null && menu == null && list == null && confirm == null && transactions == null) {
+        AdminItemMenu edit = ShopGuiManager.asEdit(holder);
+        SearchMenu search = ShopGuiManager.asSearch(holder);
+        FavoriteMenu favorites = ShopGuiManager.asFavorites(holder);
+        if (view == null && menu == null && list == null && confirm == null && transactions == null
+                && edit == null && search == null && favorites == null) {
             return;
         }
 
@@ -55,6 +59,12 @@ public final class GuiListener implements Listener {
             confirm.onClick(raw);
         } else if (transactions != null) {
             transactions.onClick(raw);
+        } else if (edit != null) {
+            edit.onClick(raw);
+        } else if (search != null) {
+            search.onClick(raw);
+        } else if (favorites != null) {
+            favorites.onClick(raw);
         } else if (view != null) {
             view.onClick(raw, event.getClick());
         } else if (list != null) {
@@ -85,7 +95,10 @@ public final class GuiListener implements Listener {
                 || ShopGuiManager.asMenu(holder) != null
                 || ShopGuiManager.asList(holder) != null
                 || ShopGuiManager.asConfirm(holder) != null
-                || ShopGuiManager.asTransactions(holder) != null;
+                || ShopGuiManager.asTransactions(holder) != null
+                || ShopGuiManager.asEdit(holder) != null
+                || ShopGuiManager.asSearch(holder) != null
+                || ShopGuiManager.asFavorites(holder) != null;
     }
 
 }

@@ -4,6 +4,10 @@ import io.github.hello09x.shop.ShopPlugin;
 import io.github.hello09x.shop.log.TransactionDatabase;
 import io.github.hello09x.shop.shop.Shop;
 import io.github.hello09x.shop.shop.ShopItem;
+import io.github.hello09x.shop.util.Schedulers;
+import io.github.hello09x.shop.util.Text;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.jetbrains.annotations.NotNull;
 
@@ -76,7 +80,7 @@ public final class StockStore {
         }
         var row = db.loadStockRow(item.shopId(), item.itemId());
         if (row != null) {
-            applyReservation(item, row.stock(), row.sold());
+            applyReservation(item, row.stock(), row.sold(), row.lastRestock());
         }
     }
 
@@ -92,10 +96,13 @@ public final class StockStore {
                     continue;
                 }
                 if (db.shared()) {
+                    int before = item.stock();
                     int after = db.restock(item.shopId(), item.itemId(), item.maxStock(),
                             item.restockAmount(), item.restockInterval() * 1000L);
                     if (after >= 0) {
                         applyReservation(item, after, item.sold());
+                        item.nextRestockAt(now + item.restockInterval() * 1000L);
+                        notifyRestock(item, before, after);
                     }
                 } else {
                     if (item.stock() >= item.maxStock()) {
@@ -105,20 +112,46 @@ public final class StockStore {
                     if (now < next) {
                         continue;
                     }
+                    int before = item.stock();
                     item.stock(Math.min(item.maxStock(), item.stock() + item.restockAmount()));
                     localNextRestock.put(item.key(), now + item.restockInterval() * 1000L);
+                    item.nextRestockAt(now + item.restockInterval() * 1000L);
                     saveItem(item);
+                    notifyRestock(item, before, item.stock());
                 }
             }
         }
     }
 
-    private void applyRows(@NotNull java.util.List<TransactionDatabase.StockRow> rows) {
-        Map<String, ShopItem> byKey = buildIndex();
+    private void notifyRestock(@NotNull ShopItem item, int before, int after) {
+        if (after <= before) {
+            return;
+        }
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (!plugin.favorites().contains(player.getUniqueId(), item.key())) {
+                continue;
+            }
+            Schedulers.entity(plugin, player, () -> player.sendMessage(Text.color(
+                    "&a[商店] &f" + item.displayName() + " &a已补货，当前库存 &f" + after)));
+        }
+    }
+
+    /** 商品刚售罄时提醒收藏了它的在线玩家 */
+    public void notifySoldOut(@NotNull ShopItem item) {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (!plugin.favorites().contains(player.getUniqueId(), item.key())) {
+                continue;
+            }
+            Schedulers.entity(plugin, player, () -> player.sendMessage(Text.color(
+                    "&c[商店] &f" + item.displayName() + " &c已售罄")));
+        }
+    }
+
+    private void applyRows(@NotNull java.util.List<TransactionDatabase.StockRow> rows) {        Map<String, ShopItem> byKey = buildIndex();
         for (var row : rows) {
             ShopItem item = byKey.get(row.shopId() + ":" + row.itemId());
             if (item != null) {
-                applyReservation(item, row.stock(), row.sold());
+                applyReservation(item, row.stock(), row.sold(), row.lastRestock());
             }
         }
     }
@@ -133,6 +166,15 @@ public final class StockStore {
         }
         item.stock(safeStock);
         item.sold(Math.max(0, sold));
+    }
+
+    public void applyReservation(@NotNull ShopItem item, int stock, int sold, long lastRestock) {
+        applyReservation(item, stock, sold);
+        if (item.hasRestock()) {
+            item.nextRestockAt(lastRestock > 0
+                    ? lastRestock + item.restockInterval() * 1000L
+                    : System.currentTimeMillis());
+        }
     }
 
     private void migrateFromFile() {

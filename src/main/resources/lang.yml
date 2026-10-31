@@ -19,6 +19,7 @@ gui:
 no-permission: '&c你没有权限这么做'
 player-only: '&c这个命令只能由玩家执行'
 no-shops: '&c还没有任何商店，请检查 plugins/XingXingShop/shops/'
+shop-closed: '&c这个活动商店还没开放或已经结束'
 shop-not-found: '&c找不到商店 &f{0}'
 hand-empty: '&c请手持一个物品再执行'
 no-currency: '&c该商品使用的货币当前不可用'

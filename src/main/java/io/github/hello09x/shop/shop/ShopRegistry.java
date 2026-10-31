@@ -199,7 +199,9 @@ public final class ShopRegistry {
         }
 
         Shop shop = new Shop(id, yaml.getString("name", id), icon,
-                yaml.getStringList("desc"), yaml.getString("permission"), type);
+                yaml.getStringList("desc"), yaml.getString("permission"), type,
+                parseDiscountUntil(yaml.getString("open-from")),
+                parseDiscountUntil(yaml.getString("open-to")));
 
         // ---------- 简写：items 是列表 ----------
         List<Map<?, ?>> shortForm = yaml.getMapList("items");

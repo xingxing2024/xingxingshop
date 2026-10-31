@@ -1,0 +1,122 @@
+package io.github.hello09x.shop.gui;
+
+import io.github.hello09x.shop.ShopPlugin;
+import io.github.hello09x.shop.shop.Shop;
+import io.github.hello09x.shop.shop.ShopItem;
+import io.github.hello09x.shop.util.Text;
+import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/** 收藏夹界面。 */
+public final class FavoriteMenu implements InventoryHolder {
+
+    private static final int PAGE_SIZE = 45;
+    private final ShopPlugin plugin;
+    private final Player viewer;
+    private final List<Hit> hits = new ArrayList<>();
+    private final Inventory inventory;
+    private int page = 1;
+
+    public FavoriteMenu(@NotNull ShopPlugin plugin, @NotNull Player viewer) {
+        this.plugin = plugin;
+        this.viewer = viewer;
+        collect();
+        this.inventory = Bukkit.createInventory(this, 54, Text.color("&8我的收藏"));
+        render();
+    }
+
+    private void collect() {
+        for (String key : plugin.favorites().list(viewer.getUniqueId())) {
+            int split = key.indexOf(':');
+            if (split <= 0) continue;
+            Shop shop = plugin.shops().get(key.substring(0, split));
+            ShopItem item = shop == null ? null : shop.find(key.substring(split + 1));
+            if (shop != null && item != null && shop.isOpen()) {
+                hits.add(new Hit(shop, item));
+            }
+        }
+    }
+
+    public void render() {
+        inventory.clear();
+        int pages = Math.max(1, (hits.size() + PAGE_SIZE - 1) / PAGE_SIZE);
+        page = Math.max(1, Math.min(page, pages));
+        int from = (page - 1) * PAGE_SIZE;
+        int to = Math.min(hits.size(), from + PAGE_SIZE);
+        for (int i = from; i < to; i++) {
+            Hit hit = hits.get(i);
+            ItemStack stack = hit.item.display();
+            ItemMeta meta = stack.getItemMeta();
+            if (meta != null) {
+                meta.setDisplayName(Text.color("&f" + hit.item.displayName()));
+                meta.setLore(List.of(
+                        Text.color("&7商店 &f" + hit.shop.name()),
+                        Text.color("&a➤ 点击进入商店")
+                ));
+                stack.setItemMeta(meta);
+            }
+            inventory.setItem(i - from, stack);
+        }
+        if (hits.isEmpty()) {
+            inventory.setItem(22, button(Material.BOOK, "&7收藏夹是空的",
+                    "&7用 /shop fav add <分类> <商品> 添加"));
+        }
+        if (page > 1) inventory.setItem(45, button(Material.ARROW, "&e« 上一页"));
+        inventory.setItem(49, button(Material.PAPER,
+                "&f第 &a" + page + " &f/ &a" + pages + " &f页",
+                "&7共 &f" + hits.size() + " &7个收藏"));
+        if (page < pages) inventory.setItem(53, button(Material.ARROW, "&e下一页 »"));
+        inventory.setItem(48, button(Material.BARRIER, "&c关闭"));
+    }
+
+    public void onClick(int slot) {
+        if (slot == 45 && page > 1) {
+            page--;
+            render();
+        } else if (slot == 53) {
+            page++;
+            render();
+        } else if (slot == 48) {
+            viewer.closeInventory();
+        } else if (slot >= 0 && slot < PAGE_SIZE) {
+            int index = (page - 1) * PAGE_SIZE + slot;
+            if (index < hits.size()) {
+                plugin.gui().open(viewer, hits.get(index).shop);
+            }
+        }
+    }
+
+    private static ItemStack button(Material material, String name, String... lore) {
+        ItemStack stack = new ItemStack(material);
+        ItemMeta meta = stack.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(Text.color(name));
+            if (lore.length > 0) {
+                meta.setLore(java.util.Arrays.stream(lore).map(Text::color).toList());
+            }
+            stack.setItemMeta(meta);
+        }
+        return stack;
+    }
+
+    @Override
+    public @NotNull Inventory getInventory() {
+        return inventory;
+    }
+
+    public @NotNull Player viewer() {
+        return viewer;
+    }
+
+    private record Hit(Shop shop, ShopItem item) {
+    }
+}
