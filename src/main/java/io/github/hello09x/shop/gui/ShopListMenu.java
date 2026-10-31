@@ -175,10 +175,7 @@ public final class ShopListMenu implements InventoryHolder {
     }
 
     private @NotNull String displayNameOf(@NotNull ShopItem item) {
-        ItemStack display = item.display();
-        var meta = display.getItemMeta();
-        String configured = meta != null && meta.hasDisplayName() ? meta.getDisplayName() : null;
-        return io.github.hello09x.shop.util.ChineseNames.ofItem(item.material(), configured);
+        return item.displayName();
     }
 
     private static @NotNull String fmt(double v) {

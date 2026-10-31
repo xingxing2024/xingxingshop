@@ -4,7 +4,6 @@ import io.github.hello09x.shop.ShopPlugin;
 import io.github.hello09x.shop.shop.Shop;
 import io.github.hello09x.shop.shop.ShopItem;
 import io.github.hello09x.shop.shop.TransactionService;
-import io.github.hello09x.shop.util.ChineseNames;
 import io.github.hello09x.shop.util.Text;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -60,7 +59,7 @@ public final class ChatInputHandler implements Listener {
         pending.put(viewer.getUniqueId(), new Pending(shop, item));
 
         plugin.messages().send(viewer, "chat-input.prompt",
-                ChineseNames.of(item.material()),
+                item.displayName(),
                 selling ? "卖出" : "购买");
 
         // 超时清理

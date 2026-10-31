@@ -5,7 +5,6 @@ import io.github.hello09x.shop.currency.Currency;
 import io.github.hello09x.shop.shop.Shop;
 import io.github.hello09x.shop.shop.ShopItem;
 import io.github.hello09x.shop.shop.TransactionService;
-import io.github.hello09x.shop.util.ChineseNames;
 import io.github.hello09x.shop.util.ItemSerializer;
 import io.github.hello09x.shop.util.Text;
 import org.bukkit.Bukkit;
@@ -205,7 +204,7 @@ public final class ShopView implements InventoryHolder {
     private int countSellable() {
         int n = 0;
         for (ShopItem item : shop.items()) {
-            if (TransactionService.count(viewer, item.material()) > 0) {
+            if (TransactionService.count(viewer, item) > 0) {
                 n++;
             }
         }
@@ -228,7 +227,7 @@ public final class ShopView implements InventoryHolder {
 
         // 图标上显示中文名（发给玩家的仍是原版物品）
         if (!meta.hasDisplayName()) {
-            meta.setDisplayName(Text.color("&f" + ChineseNames.of(item.material())));
+            meta.setDisplayName(Text.color("&f" + item.displayName()));
         }
 
         List<String> lore = new ArrayList<>();
@@ -245,7 +244,7 @@ public final class ShopView implements InventoryHolder {
 
         if (selling) {
             // 收购：显示 1 个 / 手上全部 能拿多少
-            int have = TransactionService.count(viewer, item.material());
+            int have = TransactionService.count(viewer, item);
             lore.add(Text.color("&7卖 1 个 &8» &a" + price));
             if (have > 0) {
                 // 受每日限卖限制，实际能卖的个数
@@ -454,9 +453,9 @@ public final class ShopView implements InventoryHolder {
             // 右键：收购 = 全部卖出；购买 = 1 组，都先确认
             case RIGHT -> {
                 if (selling) {
-                    int all = TransactionService.count(viewer, item.material());
+                    int all = TransactionService.count(viewer, item);
                     if (all <= 0) {
-                        plugin.messages().send(viewer, "sell.not-enough-items", ChineseNames.of(item.material()));
+                        plugin.messages().send(viewer, "sell.not-enough-items", item.displayName());
                         return;
                     }
                     plugin.gui().openConfirm(viewer, shop, item, all, true);

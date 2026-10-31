@@ -5,7 +5,6 @@ import io.github.hello09x.shop.currency.Currency;
 import io.github.hello09x.shop.shop.Shop;
 import io.github.hello09x.shop.shop.ShopItem;
 import io.github.hello09x.shop.shop.TransactionService;
-import io.github.hello09x.shop.util.ChineseNames;
 import io.github.hello09x.shop.util.Text;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -107,7 +106,7 @@ public final class ConfirmView implements InventoryHolder {
         double unit = selling ? item.sellPrice() : item.buyPrice();
         double total = unit * quantity;
 
-        meta.setDisplayName(Text.color("&6&l" + ChineseNames.of(item.material())));
+        meta.setDisplayName(Text.color("&6&l" + item.displayName()));
 
         List<String> lore = new ArrayList<>();
         lore.add("");

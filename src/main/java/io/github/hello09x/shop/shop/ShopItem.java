@@ -1,8 +1,10 @@
 package io.github.hello09x.shop.shop;
 
 import io.github.hello09x.shop.ShopPlugin;
+import io.github.hello09x.shop.util.ChineseNames;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -21,6 +23,8 @@ public final class ShopItem {
     /** GUI 图标（带中文展示名） */
     private final ItemStack display;
     private final Material material;
+    /** 自定义物品原始模板（ItemsAdder / Nexo / MMOItems），null 表示原版物品 */
+    private final @Nullable ItemStack customTemplate;
 
     /** 单个买入价 */
     private final double buyPrice;
@@ -48,6 +52,7 @@ public final class ShopItem {
             @NotNull String itemId,
             @NotNull ItemStack display,
             @NotNull Material material,
+            @Nullable ItemStack customTemplate,
             double buyPrice,
             @Nullable Double sellPrice,
             @Nullable String currencyId,
@@ -63,6 +68,7 @@ public final class ShopItem {
         this.key = shopId + ":" + itemId;
         this.display = display;
         this.material = material;
+        this.customTemplate = customTemplate == null ? null : customTemplate.clone();
         this.buyPrice = buyPrice;
         this.sellPrice = sellPrice;
         this.currencyId = currencyId;
@@ -265,6 +271,40 @@ public final class ShopItem {
         return material;
     }
 
+    /** 是否是 ItemsAdder / Nexo / MMOItems 等自定义物品 */
+    public boolean isCustom() {
+        return customTemplate != null;
+    }
+
+    /** 这个物品最大能叠多少个 */
+    public int maxStackSize() {
+        return customTemplate != null
+                ? Math.max(1, customTemplate.getMaxStackSize())
+                : material.getMaxStackSize();
+    }
+
+    /**
+     * 判断背包里的物品是不是本商品。
+     *
+     * <p>原版按材质匹配；自定义物品按完整 ItemStack 匹配（忽略数量）。</p>
+     */
+    public boolean matches(@Nullable ItemStack stack) {
+        if (stack == null || stack.getType() == Material.AIR) {
+            return false;
+        }
+        if (customTemplate != null) {
+            return stack.isSimilar(customTemplate);
+        }
+        return stack.getType() == material;
+    }
+
+    /** 展示名：优先配置 name，其次自定义物品自带名字，最后中文材质名 */
+    public @NotNull String displayName() {
+        ItemMeta meta = display.getItemMeta();
+        String configured = meta != null && meta.hasDisplayName() ? meta.getDisplayName() : null;
+        return ChineseNames.ofItem(material, configured);
+    }
+
     public @Nullable String currencyId() {
         return currencyId;
     }
@@ -280,7 +320,7 @@ public final class ShopItem {
     /**
      * 真正发放给玩家的物品。
      *
-     * <p>纯净原版物品，不带任何自定义名字和 lore。</p>
+     * <p>原版物品不带名字和 lore；自定义物品保留插件生成的完整数据。</p>
      *
      * @param amount 给多少个
      */
@@ -288,7 +328,13 @@ public final class ShopItem {
         if (amount <= 0) {
             return new ItemStack(Material.AIR);
         }
-        return new ItemStack(material, Math.min(material.getMaxStackSize(), amount));
+        int capped = Math.min(maxStackSize(), amount);
+        if (customTemplate != null) {
+            ItemStack stack = customTemplate.clone();
+            stack.setAmount(capped);
+            return stack;
+        }
+        return new ItemStack(material, capped);
     }
 
 }

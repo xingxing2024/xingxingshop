@@ -2,7 +2,6 @@ package io.github.hello09x.shop.shop;
 
 import io.github.hello09x.shop.ShopPlugin;
 import io.github.hello09x.shop.currency.Currency;
-import io.github.hello09x.shop.util.ChineseNames;
 import io.github.hello09x.shop.util.Messages;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -217,7 +216,7 @@ public final class TransactionService {
         }
 
         // 背包够不够（不够就按有的卖）
-        int has = count(player, item.material());
+        int has = count(player, item);
         if (has < quantity) {
             if (has <= 0) {
                 callback.accept(new Outcome(Result.NOT_ENOUGH_ITEMS, 0, name(item)));
@@ -229,9 +228,9 @@ public final class TransactionService {
         double unit = item.sellPrice();
         double total = round(unit * quantity);
 
-        int removed = take(player, item.material(), quantity);
+        int removed = take(player, item, quantity);
         if (removed < quantity) {
-            giveRaw(player, new ItemStack(item.material(), removed));
+            give(player, item, removed);
             callback.accept(new Outcome(Result.NOT_ENOUGH_ITEMS, has, name(item)));
             return;
         }
@@ -239,7 +238,7 @@ public final class TransactionService {
         boolean shared = plugin.transactionLog().database().shared();
         if (!shared) {
             if (!currency.deposit(player, total)) {
-                giveRaw(player, new ItemStack(item.material(), quantity));
+                give(player, item, quantity);
                 callback.accept(new Outcome(Result.ERROR, 0, name(item)));
                 return;
             }
@@ -255,7 +254,7 @@ public final class TransactionService {
 
         // 跨服：先到账，异步占用限卖额度；失败就把钱扣回来、物品还给玩家
         if (!currency.deposit(player, total)) {
-            giveRaw(player, new ItemStack(item.material(), quantity));
+            give(player, item, quantity);
             callback.accept(new Outcome(Result.ERROR, 0, name(item)));
             return;
         }
@@ -275,13 +274,13 @@ public final class TransactionService {
             runSync(() -> {
                 int granted = reserved.granted();
                 if (granted < 0) {
-                    giveRaw(player, new ItemStack(item.material(), wanted));
+                    give(player, item, wanted);
                     currency.withdraw(player, paid);
                     callback.accept(new Outcome(Result.ERROR, 0, name(item)));
                     return;
                 }
                 if (granted <= 0) {
-                    giveRaw(player, new ItemStack(item.material(), wanted));
+                    give(player, item, wanted);
                     currency.withdraw(player, paid);
                     callback.accept(new Outcome(Result.SELL_LIMIT_REACHED, item.sellLimit(), name(item)));
                     return;
@@ -291,7 +290,7 @@ public final class TransactionService {
                 if (granted < wanted) {
                     // 别的服先把限卖额度用掉了，把多扣的物品和钱还回去
                     int unused = wanted - granted;
-                    giveRaw(player, new ItemStack(item.material(), unused));
+                    give(player, item, unused);
                     currency.withdraw(player, round(unitPrice * unused));
                     finalTotal = round(unitPrice * granted);
                 }
@@ -334,7 +333,7 @@ public final class TransactionService {
     private void give(@NotNull Player player, @NotNull ShopItem item, int quantity) {
         int remaining = quantity;
         while (remaining > 0) {
-            int batch = Math.min(remaining, item.material().getMaxStackSize());
+            int batch = Math.min(remaining, item.maxStackSize());
             giveRaw(player, item.reward(batch));
             remaining -= batch;
         }
@@ -350,22 +349,22 @@ public final class TransactionService {
         }
     }
 
-    public static int count(@NotNull Player player, @NotNull Material material) {
+    public static int count(@NotNull Player player, @NotNull ShopItem item) {
         int n = 0;
         for (ItemStack s : player.getInventory().getStorageContents()) {
-            if (s != null && s.getType() == material) {
+            if (item.matches(s)) {
                 n += s.getAmount();
             }
         }
         return n;
     }
 
-    public static int take(@NotNull Player player, @NotNull Material material, int amount) {
+    public static int take(@NotNull Player player, @NotNull ShopItem item, int amount) {
         int removed = 0;
         ItemStack[] contents = player.getInventory().getStorageContents();
         for (int i = 0; i < contents.length && removed < amount; i++) {
             ItemStack s = contents[i];
-            if (s == null || s.getType() != material) {
+            if (!item.matches(s)) {
                 continue;
             }
             int take = Math.min(s.getAmount(), amount - removed);
@@ -380,8 +379,7 @@ public final class TransactionService {
     }
 
     private static String name(@NotNull ShopItem item) {
-        // 直接查中文名表，不依赖 GUI 运行时给图标设的名字
-        return ChineseNames.of(item.material());
+        return item.displayName();
     }
 
     private static double round(double v) {

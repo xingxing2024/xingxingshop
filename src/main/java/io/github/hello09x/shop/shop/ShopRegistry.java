@@ -6,6 +6,7 @@ import io.github.hello09x.shop.util.Text;
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -176,13 +177,26 @@ public final class ShopRegistry {
             @NotNull Shop.Type type,
             int autoSlot
     ) {
-        Material material = matchMaterial(s.getString("material"));
-        if (material == null) {
-            material = matchMaterial(itemId);
-        }
-        if (material == null) {
-            plugin.getLogger().warning(shopId + " 的商品 " + itemId + " 材质无效");
-            return null;
+        String customId = s.getString("custom-item");
+        ItemStack customTemplate = null;
+        Material material;
+        if (customId != null && !customId.isBlank()) {
+            customTemplate = CustomItems.resolve(customId);
+            if (customTemplate == null) {
+                plugin.getLogger().warning(shopId + " 的商品 " + itemId
+                        + " 自定义物品无法解析：" + customId);
+                return null;
+            }
+            material = customTemplate.getType();
+        } else {
+            material = matchMaterial(s.getString("material"));
+            if (material == null) {
+                material = matchMaterial(itemId);
+            }
+            if (material == null) {
+                plugin.getLogger().warning(shopId + " 的商品 " + itemId + " 材质无效");
+                return null;
+            }
         }
 
         boolean sell = type == Shop.Type.SELL;
@@ -210,12 +224,15 @@ public final class ShopRegistry {
         List<String> lore = s.isList("lore") ? s.getStringList("lore")
                 : s.getString("lore") == null ? List.of() : List.of(s.getString("lore"));
 
-        var display = ItemSerializer.buildDisplay(
-                material, 1, s.getString("name"), lore,
-                s.getInt("custom-model-data", 0), s.getBoolean("glow", false));
+        var display = customTemplate != null
+                ? ItemSerializer.decorate(customTemplate, s.getString("name"), lore,
+                        s.getInt("custom-model-data", 0), s.getBoolean("glow", false))
+                : ItemSerializer.buildDisplay(
+                        material, 1, s.getString("name"), lore,
+                        s.getInt("custom-model-data", 0), s.getBoolean("glow", false));
 
         return new ShopItem(
-                shopId, itemId, display, material,
+                shopId, itemId, display, material, customTemplate,
                 buyPrice,
                 sellPrice,
                 s.getString("currency"),
@@ -282,11 +299,6 @@ public final class ShopRegistry {
         if (parts.length == 0) {
             return null;
         }
-        Material material = matchMaterial(parts[0]);
-        if (material == null) {
-            plugin.getLogger().warning(shopId + " 简写商品材质无效：" + parts[0]);
-            return null;
-        }
         double price = parts.length > 1 ? parse(parts[1], 0) : 0;
         boolean sell = type == Shop.Type.SELL;
 
@@ -300,6 +312,28 @@ public final class ShopRegistry {
             }
         }
 
+        boolean glow = boolOpt(opts, "glow", false);
+        int modelData = intOpt(opts, "custom-model-data",
+                intOpt(opts, "model", 0));
+
+        String customId = opts.get("custom-item");
+        ItemStack customTemplate = null;
+        Material material;
+        if (customId != null && !customId.isBlank()) {
+            customTemplate = CustomItems.resolve(customId);
+            if (customTemplate == null) {
+                plugin.getLogger().warning(shopId + " 简写商品自定义物品无法解析：" + customId);
+                return null;
+            }
+            material = customTemplate.getType();
+        } else {
+            material = matchMaterial(parts[0]);
+            if (material == null) {
+                plugin.getLogger().warning(shopId + " 简写商品材质无效：" + parts[0]);
+                return null;
+            }
+        }
+
         int stock = intOpt(opts, "stock", 0);
         int limit = intOpt(opts, "limit", 0);
         int sellLimit = opts.containsKey("sell-limit")
@@ -307,9 +341,6 @@ public final class ShopRegistry {
                 : (sell ? -1 : 0);
         boolean dynamic = boolOpt(opts, "dynamic", false);
         int slot = normalizeSlot(intOpt(opts, "slot", -1));
-        boolean glow = boolOpt(opts, "glow", false);
-        int modelData = intOpt(opts, "custom-model-data",
-                intOpt(opts, "model", 0));
 
         double buyPrice;
         Double sellPrice;
@@ -321,13 +352,15 @@ public final class ShopRegistry {
             sellPrice = opts.containsKey("sell") ? parse(opts.get("sell"), 0) : null;
         }
 
-        var display = ItemSerializer.buildDisplay(material, 1, null, null, modelData, glow);
+        var display = customTemplate != null
+                ? ItemSerializer.decorate(customTemplate, opts.get("name"), null, modelData, glow)
+                : ItemSerializer.buildDisplay(material, 1, null, null, modelData, glow);
         String itemId = fixedItemId != null
                 ? fixedItemId
                 : material.name().toLowerCase(Locale.ROOT) + "_" + index;
 
         return new ShopItem(
-                shopId, itemId, display, material,
+                shopId, itemId, display, material, customTemplate,
                 buyPrice,
                 sellPrice,
                 opts.get("currency"),

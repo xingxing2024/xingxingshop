@@ -5,7 +5,6 @@ import io.github.hello09x.shop.currency.Currency;
 import io.github.hello09x.shop.ShopPlugin;
 import io.github.hello09x.shop.shop.Shop;
 import io.github.hello09x.shop.shop.ShopItem;
-import io.github.hello09x.shop.util.ChineseNames;
 import io.github.hello09x.shop.util.ItemSerializer;
 import io.github.hello09x.shop.util.Text;
 import org.bukkit.Bukkit;
@@ -659,7 +658,7 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Text.color("&8&m--------&r &6商品详情 &8&m--------"));
         sender.sendMessage(Text.color("&7分类 &f" + shop.id() + " &7(" + shop.name() + "&7)"));
         sender.sendMessage(Text.color("&7ID &f" + item.itemId()));
-        sender.sendMessage(Text.color("&7物品 &f" + ChineseNames.of(item.material())));
+        sender.sendMessage(Text.color("&7物品 &f" + item.displayName()));
         sender.sendMessage(Text.color("&7买价 &f" + item.baseBuyPrice()
                 + (item.isDynamicActive() ? " &d(动态，当前 " + item.buyPrice() + ")" : "")));
         sender.sendMessage(Text.color("&7卖价 &f" + item.sellPrice()));

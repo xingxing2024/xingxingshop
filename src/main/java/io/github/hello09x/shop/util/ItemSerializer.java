@@ -31,6 +31,20 @@ public final class ItemSerializer {
             boolean glow
     ) {
         ItemStack stack = new ItemStack(material, Math.max(1, Math.min(amount, material.getMaxStackSize())));
+        return decorate(stack, name, lore, customModelData, glow);
+    }
+
+    /**
+     * 给现成的物品（包括 ItemsAdder / Nexo / MMOItems 物品）加显示名和 lore。
+     */
+    public static @NotNull ItemStack decorate(
+            @NotNull ItemStack source,
+            @Nullable String name,
+            @Nullable List<String> lore,
+            int customModelData,
+            boolean glow
+    ) {
+        ItemStack stack = source.clone();
         ItemMeta meta = stack.getItemMeta();
         if (meta == null) {
             return stack;
