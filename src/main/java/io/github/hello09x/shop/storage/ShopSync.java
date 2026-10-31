@@ -140,7 +140,12 @@ public final class ShopSync {
             if (local != null) {
                 for (File file : local) {
                     if (!configs.containsKey(file.getName())) {
-                        Files.deleteIfExists(file.toPath());
+                        // 不直接删除：改名保留，误同步/误判时还能找回
+                        Path backup = new File(folder, file.getName() + ".deleted").toPath();
+                        Files.move(file.toPath(), backup,
+                                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        plugin.getLogger().info("其他服已删除商店 " + file.getName()
+                                + "，本地已改名为 " + backup.getFileName() + " 保留");
                     }
                 }
             }

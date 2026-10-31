@@ -164,10 +164,9 @@ public final class StockStore {
         if (today.equals(limitNoticeDay.get(uuid))) {
             return;
         }
-        limitNoticeDay.put(uuid, today);
 
         Schedulers.entity(plugin, player, () -> {
-            if (!player.isOnline()) {
+            if (!player.isOnline() || today.equals(limitNoticeDay.get(uuid))) {
                 return;
             }
             List<String> names = new ArrayList<>();
@@ -188,12 +187,18 @@ public final class StockStore {
                     break;
                 }
             }
+            limitNoticeDay.put(uuid, today);
             if (names.isEmpty()) {
                 return;
             }
             player.sendMessage(Text.color("&a[商店] &7新的一天，收藏的 &f"
                     + String.join("、", names) + " &7限购 / 限卖额度已刷新"));
         });
+    }
+
+    /** 玩家下线后清掉提醒记录，避免长期占用内存 */
+    public void forgetDailyNotice(@NotNull Player player) {
+        limitNoticeDay.remove(player.getUniqueId());
     }
 
     private void applyRows(@NotNull java.util.List<TransactionDatabase.StockRow> rows) {        Map<String, ShopItem> byKey = buildIndex();

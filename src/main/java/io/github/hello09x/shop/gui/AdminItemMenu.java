@@ -86,7 +86,7 @@ public final class AdminItemMenu implements InventoryHolder {
 
     private void changePrice(double delta) {
         if (shop.type() == Shop.Type.SELL) {
-            item.setSellPrice(Math.max(0, item.sellPrice() + delta));
+            item.setSellPrice(Math.max(0, item.baseSellPrice() + delta));
         } else {
             item.setBaseBuyPrice(Math.max(0, item.baseBuyPrice() + delta));
         }
@@ -110,7 +110,7 @@ public final class AdminItemMenu implements InventoryHolder {
             YamlConfiguration yaml = YamlConfiguration.loadConfiguration(plugin.shops().fileOf(shop.id()));
             String key = shop.type() == Shop.Type.SELL ? "sell" : "buy";
             yaml.set("items." + item.itemId() + "." + key,
-                    shop.type() == Shop.Type.SELL ? item.sellPrice() : item.baseBuyPrice());
+                    shop.type() == Shop.Type.SELL ? item.baseSellPrice() : item.baseBuyPrice());
             yaml.save(plugin.shops().fileOf(shop.id()));
         } catch (Exception e) {
             plugin.messages().send(viewer, "failed");

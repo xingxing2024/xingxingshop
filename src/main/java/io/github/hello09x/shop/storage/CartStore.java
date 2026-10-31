@@ -15,7 +15,8 @@ public final class CartStore {
 
     public void add(@NotNull UUID player, @NotNull String itemKey, int quantity) {
         carts.computeIfAbsent(player, k -> new LinkedHashMap<>())
-                .merge(itemKey, Math.max(1, quantity), Integer::sum);
+                .merge(itemKey, Math.min(100_000, Math.max(1, quantity)),
+                        (a, b) -> Math.min(100_000, a + b));
     }
 
     public @NotNull Map<String, Integer> items(@NotNull UUID player) {

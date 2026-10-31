@@ -31,6 +31,7 @@ public final class TransactionMenu implements InventoryHolder {
     private final Player viewer;
     private final Inventory inventory;
     private int page;
+    private int totalPages = 1;
 
     public TransactionMenu(@NotNull ShopPlugin plugin, @NotNull Player viewer, int page) {
         this.plugin = plugin;
@@ -45,15 +46,17 @@ public final class TransactionMenu implements InventoryHolder {
         inventory.clear();
         GuiStyle.fill(inventory, ITEM_START, ITEM_START + PAGE_SIZE);
         GuiStyle.frame(inventory, Material.CYAN_STAINED_GLASS_PANE);
+
+        int total = plugin.transactionLog().count(null);
+        int pages = Math.max(1, (total + PAGE_SIZE - 1) / PAGE_SIZE);
+        page = Math.max(1, Math.min(page, pages));
+        totalPages = pages;
+
         List<TransactionLog.Record> records = plugin.transactionLog().query(null, page, PAGE_SIZE);
         for (int i = 0; i < records.size(); i++) {
             inventory.setItem(ITEM_START + i, icon(records.get(i)));
         }
-        int total = plugin.transactionLog().count(null);
-        int pages = Math.max(1, (total + PAGE_SIZE - 1) / PAGE_SIZE);
-        if (page > pages) {
-            page = pages;
-        }
+
         inventory.setItem(4, button(Material.WRITABLE_BOOK,
                 "&b&l交易记录",
                 "&7共 &f" + total + " &7条"));
@@ -114,7 +117,7 @@ public final class TransactionMenu implements InventoryHolder {
             page--;
             Sounds.play(viewer, "page");
             render();
-        } else if (slot == 53) {
+        } else if (slot == 53 && page < totalPages) {
             page++;
             Sounds.play(viewer, "page");
             render();

@@ -77,7 +77,7 @@ public final class ConfirmView implements InventoryHolder {
         inventory.setItem(INFO_SLOT, infoIcon());
 
         // 确认 / 取消
-        Currency currency = plugin.currencies().getOrDefault(item.currencyId());
+        Currency currency = plugin.currencies().resolve(item.currencyId());
         double unit = selling ? item.sellPrice(viewer) : item.buyPrice(viewer);
         double total = unit * quantity;
 
@@ -95,7 +95,7 @@ public final class ConfirmView implements InventoryHolder {
             return stack;
         }
 
-        Currency currency = plugin.currencies().getOrDefault(item.currencyId());
+        Currency currency = plugin.currencies().resolve(item.currencyId());
         double unit = selling ? item.sellPrice(viewer) : item.buyPrice(viewer);
         double total = unit * quantity;
 

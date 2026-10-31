@@ -449,6 +449,10 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
                 plugin.messages().send(sender, "shop-closed");
                 return true;
             }
+            if (shop.type() != Shop.Type.BUY) {
+                sender.sendMessage(Text.color("&c收购商店只能出售，不能加入购物车"));
+                return true;
+            }
             int quantity = 1;
             if (args.length > 4) {
                 try {
@@ -456,6 +460,10 @@ public final class ShopCommand implements CommandExecutor, TabCompleter {
                 } catch (NumberFormatException ignored) {
                     // 默认 1
                 }
+            }
+            if (quantity > 100_000) {
+                sender.sendMessage(Text.color("&c单次最多 100000 个"));
+                return true;
             }
             plugin.cart().add(player.getUniqueId(), item.key(), quantity);
             sender.sendMessage(Text.color("&a已加入购物车：" + item.displayName() + " × " + quantity));

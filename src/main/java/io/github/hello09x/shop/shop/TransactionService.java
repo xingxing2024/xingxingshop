@@ -21,6 +21,9 @@ import java.util.function.Consumer;
  */
 public final class TransactionService {
 
+    /** 单次交易最大数量，防止异常数量拖垮服务器 */
+    private static final int MAX_QUANTITY = 100_000;
+
     public enum Result {
         SUCCESS,
         NO_PERMISSION,
@@ -65,6 +68,15 @@ public final class TransactionService {
             callback.accept(new Outcome(Result.ERROR, 0, name(item)));
             return;
         }
+        if (quantity > MAX_QUANTITY) {
+            callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+            return;
+        }
+        // 收购商店只能卖，不能反向购买（否则 0 价商品会被免费刷出）
+        if (shop.type() != Shop.Type.BUY) {
+            callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+            return;
+        }
         if (plugin.isDisabling()) {
             callback.accept(new Outcome(Result.ERROR, 0, name(item)));
             return;
@@ -74,7 +86,7 @@ public final class TransactionService {
             return;
         }
 
-        Currency currency = plugin.currencies().getOrDefault(item.currencyId());
+        Currency currency = plugin.currencies().resolve(item.currencyId());
         if (currency == null || !currency.available()) {
             callback.accept(new Outcome(Result.NO_CURRENCY, 0, name(item)));
             return;
@@ -223,6 +235,10 @@ public final class TransactionService {
             callback.accept(new Outcome(Result.ERROR, 0, name(item)));
             return;
         }
+        if (quantity > MAX_QUANTITY) {
+            callback.accept(new Outcome(Result.ERROR, 0, name(item)));
+            return;
+        }
         if (plugin.isDisabling()) {
             callback.accept(new Outcome(Result.ERROR, 0, name(item)));
             return;
@@ -232,7 +248,7 @@ public final class TransactionService {
             return;
         }
 
-        Currency currency = plugin.currencies().getOrDefault(item.currencyId());
+        Currency currency = plugin.currencies().resolve(item.currencyId());
         if (currency == null || !currency.available() || !currency.supportsDeposit()) {
             callback.accept(new Outcome(Result.NO_CURRENCY, 0, name(item)));
             return;
@@ -359,7 +375,11 @@ public final class TransactionService {
 
     /** 把异步结果切回玩家所属线程；关服时排队，由 onDisable 执行 */
     private void runSync(@NotNull Player player, @NotNull Runnable task) {
+        java.util.concurrent.atomic.AtomicBoolean started = new java.util.concurrent.atomic.AtomicBoolean();
         Runnable wrapped = () -> {
+            if (!started.compareAndSet(false, true)) {
+                return;
+            }
             try {
                 task.run();
             } finally {
@@ -373,7 +393,10 @@ public final class TransactionService {
         try {
             Schedulers.entity(plugin, player, wrapped);
         } catch (Throwable t) {
-            plugin.enqueueTradeCompletion(wrapped);
+            // 只有任务还没开始执行时才补投递，避免已经发过货又执行一遍
+            if (!started.get()) {
+                plugin.enqueueTradeCompletion(wrapped);
+            }
         }
     }
 

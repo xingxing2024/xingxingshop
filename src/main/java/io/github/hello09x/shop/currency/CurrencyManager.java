@@ -74,6 +74,17 @@ public final class CurrencyManager {
     }
 
     /**
+     * 严格解析商品指定的货币：写了 id 但货币不可用就返回 null，不再静默换成别的货币。
+     */
+    public @Nullable Currency resolve(@Nullable String id) {
+        if (id == null) {
+            return getOrDefault(null);
+        }
+        Currency c = get(id);
+        return c != null && c.available() ? c : null;
+    }
+
+    /**
      * 取一个可用货币；找不到就依次回退到默认货币、任意可用货币。
      *
      * @return {@code null} 表示当前服务器没有任何可用货币

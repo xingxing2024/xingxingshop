@@ -6,6 +6,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -38,6 +39,11 @@ public final class PlayerJoinListener implements Listener {
                 plugin.getLogger().warning("提醒限购刷新失败：" + t.getMessage());
             }
         }, 40L);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onQuit(@NotNull PlayerQuitEvent event) {
+        plugin.stocks().forgetDailyNotice(event.getPlayer());
     }
 
 }

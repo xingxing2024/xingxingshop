@@ -260,7 +260,3 @@ custom-currency: {}
 #   vip点:
 #     display-name: 'VIP点'
 #     placeholder: '%vip_points%'
-# 自动识别固定价格的 TrMenu 捕捉箱购买，余额与到账双重校验。
-external-trades:
-  trmenu-nekotraps:
-    enabled: true

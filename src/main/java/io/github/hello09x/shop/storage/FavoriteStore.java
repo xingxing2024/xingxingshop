@@ -45,13 +45,23 @@ public final class FavoriteStore {
         }
     }
 
-    public void save() {
+    public synchronized void save() {
         YamlConfiguration yaml = new YamlConfiguration();
         for (var entry : data.entrySet()) {
             yaml.set(entry.getKey().toString(), new ArrayList<>(entry.getValue()));
         }
         try {
-            yaml.save(file);
+            java.nio.file.Path target = file.toPath();
+            java.nio.file.Path temp = target.resolveSibling(file.getName() + ".tmp");
+            yaml.save(temp.toFile());
+            try {
+                java.nio.file.Files.move(temp, target,
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                java.nio.file.Files.move(temp, target,
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (Exception e) {
             plugin.getLogger().warning("保存 favorites.yml 失败：" + e.getMessage());
         }

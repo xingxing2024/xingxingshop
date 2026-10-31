@@ -208,7 +208,7 @@ public final class ShopView implements InventoryHolder {
 
     private @NotNull ItemStack icon(@NotNull ShopItem item) {
         boolean selling = shop.type() == Shop.Type.SELL;
-        Currency currency = plugin.currencies().getOrDefault(item.currencyId());
+        Currency currency = plugin.currencies().resolve(item.currencyId());
 
         ItemStack stack = item.display();
         ItemMeta meta = stack.getItemMeta();
@@ -482,6 +482,10 @@ public final class ShopView implements InventoryHolder {
     }
 
     private void addToCart(@NotNull ShopItem item) {
+        if (shop.type() != Shop.Type.BUY) {
+            viewer.sendMessage(Text.color("&c收购商店只能出售，不能加入购物车"));
+            return;
+        }
         if (item.isLimitedStock() && item.stock() <= 0) {
             io.github.hello09x.shop.util.Sounds.play(viewer, "out-of-stock");
             viewer.sendMessage(Text.color("&c[商店] &f" + item.displayName() + " &c已售罄"));

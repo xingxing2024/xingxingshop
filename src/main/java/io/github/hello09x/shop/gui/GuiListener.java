@@ -62,10 +62,11 @@ public final class GuiListener implements Listener {
         // 确认界面的「确认 / 取消」有自己的防重复锁，不能再被连点冷却挡住
         if (confirm == null) {
             long now = System.currentTimeMillis();
-            Long last = lastClick.put(event.getWhoClicked().getUniqueId(), now);
+            Long last = lastClick.get(event.getWhoClicked().getUniqueId());
             if (last != null && now - last < CLICK_COOLDOWN_MS) {
                 return;
             }
+            lastClick.put(event.getWhoClicked().getUniqueId(), now);
             if (lastClick.size() > 200) {
                 lastClick.entrySet().removeIf(e -> now - e.getValue() > 10_000L);
             }
