@@ -88,6 +88,19 @@ public final class SelfTest {
             check("新商店改为块状 items", createdText.contains("items:\n  stone:"));
             check("新商店商品可读", new YamlShopFile(created).readItems(false).size() == 1);
 
+            // GBK 文件：读取不乱码，保存后仍用 GBK
+            Path gbkFile = dir.resolve("gbk.yml");
+            String gbkText = "# 中文注释\nid: gbk\nname: '中文商店'\nitems:\n  stone: 1\n";
+            Files.write(gbkFile, gbkText.getBytes(java.nio.charset.Charset.forName("GBK")));
+            YamlShopFile gbkDoc = new YamlShopFile(gbkFile);
+            check("GBK 中文读取", gbkDoc.readShop().name.equals("中文商店"));
+            ShopData gbkShop = gbkDoc.readShop();
+            gbkShop.name = "新的中文名";
+            gbkDoc.applyShop(gbkShop);
+            gbkDoc.save();
+            String gbkSaved = new String(Files.readAllBytes(gbkFile), java.nio.charset.Charset.forName("GBK"));
+            check("GBK 保存未变 UTF-8 乱码", gbkSaved.contains("新的中文名") && gbkSaved.contains("# 中文注释"));
+
             delete(dir);
             System.out.println("SELFTEST PASS");
             return 0;

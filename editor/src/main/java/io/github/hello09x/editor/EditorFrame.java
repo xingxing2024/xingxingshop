@@ -23,8 +23,7 @@ public final class EditorFrame extends JFrame {
 
     private final DefaultListModel<ShopData> shopModel = new DefaultListModel<>();
     private final JList<ShopData> shopList = new JList<>(shopModel);
-    private final ItemTableModel itemModel = new ItemTableModel();
-    private final JTable itemTable = new JTable(itemModel);
+    private final ItemGridPanel itemGrid = new ItemGridPanel();
 
     private final JTextField idField = new JTextField();
     private final JTextField nameField = new JTextField();
@@ -257,43 +256,33 @@ public final class EditorFrame extends JFrame {
     }
 
     private JPanel buildItems() {
-        McTheme.table(itemTable);
-        itemTable.setAutoCreateRowSorter(true);
-        itemTable.setFillsViewportHeight(true);
-        int[] widths = {150, 170, 70, 70, 80, 70, 70, 70, 110};
-        for (int i = 0; i < widths.length && i < itemTable.getColumnCount(); i++) {
-            itemTable.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
-        }
-        itemTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-        itemTable.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseClicked(java.awt.event.MouseEvent e) {
-                if (e.getClickCount() >= 2) {
-                    editItem();
-                }
-            }
-        });
-
-        JScrollPane scroll = new JScrollPane(itemTable);
+        itemGrid.setOnEdit(item -> editItem(item));
+        JScrollPane scroll = new JScrollPane(itemGrid);
         scroll.setBorder(McTheme.slotBorder());
         scroll.getViewport().setBackground(McTheme.PANEL);
         scroll.getViewport().setOpaque(true);
         scroll.setOpaque(false);
+        scroll.getVerticalScrollBar().setUnitIncrement(18);
 
         JPanel buttons = McTheme.panel(new FlowLayout(FlowLayout.LEFT, 8, 6));
         JButton add = McTheme.button("添加商品");
         add.addActionListener(e -> addItem());
-        JButton edit = McTheme.button("编辑商品");
-        edit.addActionListener(e -> editItem());
-        JButton delete = McTheme.button("删除商品");
+        JButton edit = McTheme.button("编辑选中");
+        edit.addActionListener(e -> {
+            ItemData selected = itemGrid.getSelected();
+            if (selected != null) {
+                editItem(selected);
+            }
+        });
+        JButton delete = McTheme.button("删除选中");
         delete.addActionListener(e -> deleteItem());
         buttons.add(add);
         buttons.add(edit);
         buttons.add(delete);
-        buttons.add(McTheme.label("双击商品可编辑", McTheme.MUTED));
+        buttons.add(McTheme.label("左键点击格子直接编辑", McTheme.MUTED));
 
         JPanel card = McTheme.card();
-        card.add(McTheme.label("商品列表", McTheme.GOLD), BorderLayout.NORTH);
+        card.add(McTheme.label("商品背包", McTheme.GOLD), BorderLayout.NORTH);
         card.add(scroll, BorderLayout.CENTER);
         card.add(buttons, BorderLayout.SOUTH);
 
@@ -320,7 +309,7 @@ public final class EditorFrame extends JFrame {
 
     private void reloadFolder() {
         shopModel.clear();
-        itemModel.setItems(List.of());
+        itemGrid.setItems(List.of());
         current = null;
         if (folder == null || !Files.isDirectory(folder)) {
             status.setText("请选择 shops 文件夹");
@@ -360,8 +349,10 @@ public final class EditorFrame extends JFrame {
         permissionField.setText(shop.permission);
         openFromField.setText(shop.openFrom);
         openToField.setText(shop.openTo);
-        itemModel.setItems(shop.document.readItems(shop.selling()));
-        status.setText(shop.file.toString() + "  ·  " + itemModel.getRowCount() + " 件商品");
+        itemGrid.setSelling(shop.selling());
+        List<ItemData> items = shop.document.readItems(shop.selling());
+        itemGrid.setItems(items);
+        status.setText(shop.file.toString() + "  ·  " + items.size() + " 件商品");
     }
 
     private void saveSettings() {
@@ -416,7 +407,7 @@ public final class EditorFrame extends JFrame {
         if (item == null) {
             return;
         }
-        if (itemModel.contains(item.id)) {
+        if (current.document.readItems(current.selling()).stream().anyMatch(i -> i.id.equals(item.id))) {
             JOptionPane.showMessageDialog(this, "商品 ID 已存在：" + item.id,
                     "无法添加", JOptionPane.WARNING_MESSAGE);
             return;
@@ -432,16 +423,10 @@ public final class EditorFrame extends JFrame {
         }
     }
 
-    private void editItem() {
-        if (current == null) {
+    private void editItem(ItemData old) {
+        if (current == null || old == null) {
             return;
         }
-        int row = itemTable.getSelectedRow();
-        if (row < 0) {
-            JOptionPane.showMessageDialog(this, "请先选择一个商品", "提示", JOptionPane.INFORMATION_MESSAGE);
-            return;
-        }
-        ItemData old = itemModel.get(itemTable.convertRowIndexToModel(row));
         ItemData edited = ItemDialog.show(this, old.copy(), current.selling(), false);
         if (edited == null) {
             return;
@@ -461,12 +446,11 @@ public final class EditorFrame extends JFrame {
         if (current == null) {
             return;
         }
-        int row = itemTable.getSelectedRow();
-        if (row < 0) {
-            JOptionPane.showMessageDialog(this, "请先选择一个商品", "提示", JOptionPane.INFORMATION_MESSAGE);
+        ItemData item = itemGrid.getSelected();
+        if (item == null) {
+            JOptionPane.showMessageDialog(this, "请先点击选择一个商品", "提示", JOptionPane.INFORMATION_MESSAGE);
             return;
         }
-        ItemData item = itemModel.get(itemTable.convertRowIndexToModel(row));
         int answer = JOptionPane.showConfirmDialog(this, "确定删除商品 " + item.id + "？",
                 "删除商品", JOptionPane.YES_NO_OPTION);
         if (answer != JOptionPane.YES_OPTION) {
@@ -530,7 +514,7 @@ public final class EditorFrame extends JFrame {
             shopModel.removeElement(shop);
             if (current == shop) {
                 current = null;
-                itemModel.setItems(List.of());
+                itemGrid.setItems(List.of());
             }
             status.setText("已移动到 deleted/" + name);
         } catch (Exception e) {
@@ -567,61 +551,6 @@ public final class EditorFrame extends JFrame {
             metaLabel.setForeground(shop.selling() ? McTheme.GOLD : McTheme.AQUA);
             setToolTipText(shop.file.toString());
             return this;
-        }
-    }
-
-    /** 表格模型。 */
-    private static final class ItemTableModel extends AbstractTableModel {
-
-        private static final String[] COLUMNS = {
-                "商品 ID", "材质", "买价", "卖价", "库存", "限购", "限卖", "折扣", "补货", "动态"
-        };
-        private List<ItemData> items = new ArrayList<>();
-
-        void setItems(List<ItemData> items) {
-            this.items = new ArrayList<>(items);
-            fireTableDataChanged();
-        }
-
-        boolean contains(String id) {
-            return items.stream().anyMatch(i -> i.id.equals(id));
-        }
-
-        ItemData get(int row) {
-            return items.get(row);
-        }
-
-        @Override
-        public int getRowCount() {
-            return items.size();
-        }
-
-        @Override
-        public int getColumnCount() {
-            return COLUMNS.length;
-        }
-
-        @Override
-        public String getColumnName(int column) {
-            return COLUMNS[column];
-        }
-
-        @Override
-        public Object getValueAt(int row, int column) {
-            ItemData item = items.get(row);
-            return switch (column) {
-                case 0 -> item.id;
-                case 1 -> item.customItem.isBlank() ? item.material : item.customItem;
-                case 2 -> item.buy;
-                case 3 -> item.sell;
-                case 4 -> item.stock;
-                case 5 -> item.limit;
-                case 6 -> item.sellLimit;
-                case 7 -> item.discount;
-                case 8 -> item.restock.isBlank() ? "" : item.restock + " / " + item.restockInterval + "s";
-                case 9 -> item.dynamic ? "是" : "";
-                default -> "";
-            };
         }
     }
 }

@@ -15,6 +15,10 @@ import org.yaml.snakeyaml.representer.Representer;
 import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -33,6 +37,8 @@ public final class YamlShopFile {
     private final Path path;
     private final Yaml yaml;
     private MappingNode root;
+    private Charset charset = StandardCharsets.UTF_8;
+    private boolean bom;
 
     public YamlShopFile(Path path) throws IOException {
         this.path = path;
@@ -61,12 +67,40 @@ public final class YamlShopFile {
     }
 
     public void load() throws IOException {
-        String text = Files.readString(path, StandardCharsets.UTF_8);
+        byte[] bytes = Files.readAllBytes(path);
+        String text;
+        if (bytes.length >= 3 && (bytes[0] & 0xFF) == 0xEF
+                && (bytes[1] & 0xFF) == 0xBB && (bytes[2] & 0xFF) == 0xBF) {
+            bom = true;
+            charset = StandardCharsets.UTF_8;
+            text = new String(bytes, 3, bytes.length - 3, StandardCharsets.UTF_8);
+        } else {
+            try {
+                text = decodeStrict(bytes, StandardCharsets.UTF_8);
+                charset = StandardCharsets.UTF_8;
+            } catch (CharacterCodingException utf8Error) {
+                try {
+                    text = decodeStrict(bytes, Charset.forName("GBK"));
+                    charset = Charset.forName("GBK");
+                } catch (Exception gbkError) {
+                    text = new String(bytes, StandardCharsets.UTF_8);
+                    charset = StandardCharsets.UTF_8;
+                }
+            }
+        }
         Node node = yaml.compose(new StringReader(text));
         if (!(node instanceof MappingNode map)) {
             throw new IOException("不是有效的商店 YAML：" + path.getFileName());
         }
         this.root = map;
+    }
+
+    private static String decodeStrict(byte[] bytes, Charset charset) throws CharacterCodingException {
+        return charset.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString();
     }
 
     public ShopData readShop() {
@@ -223,8 +257,19 @@ public final class YamlShopFile {
         }
         StringWriter writer = new StringWriter();
         yaml.serialize(root, writer);
+        byte[] body = writer.toString().getBytes(charset);
+        byte[] data;
+        if (bom) {
+            data = new byte[body.length + 3];
+            data[0] = (byte) 0xEF;
+            data[1] = (byte) 0xBB;
+            data[2] = (byte) 0xBF;
+            System.arraycopy(body, 0, data, 3, body.length);
+        } else {
+            data = body;
+        }
         Path temp = path.resolveSibling(path.getFileName() + ".tmp");
-        Files.writeString(temp, writer.toString(), StandardCharsets.UTF_8);
+        Files.write(temp, data);
         Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING);
     }
 

@@ -64,35 +64,42 @@ public final class ThemePreview {
         leftButtons.add(McTheme.button("删除商店"));
         left.add(leftButtons, BorderLayout.SOUTH);
 
-        DefaultTableModel model = new DefaultTableModel(
-                new Object[][]{
-                        {"diamond", "DIAMOND", "260", "", "300", "16", "", "", ""},
-                        {"iron_ingot", "IRON_INGOT", "18", "6", "500", "", "", "0.8", "10 / 3600s"},
-                        {"gold_ingot", "GOLD_INGOT", "42", "12", "260", "", "", "", ""},
-                        {"cobblestone", "COBBLESTONE", "0.65", "0.02", "", "", "1000", "", ""},
-                },
-                new Object[]{"商品 ID", "材质", "买价", "卖价", "库存", "限购", "限卖", "折扣", "补货"});
-        JTable table = new JTable(model);
-        McTheme.table(table);
-        table.setFillsViewportHeight(true);
-        int[] widths = {150, 170, 60, 60, 70, 60, 60, 60, 100};
-        for (int i = 0; i < widths.length && i < table.getColumnCount(); i++) {
-            table.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
+        ItemGridPanel grid = new ItemGridPanel();
+        grid.setSelling(false);
+        java.util.List<ItemData> samples = new java.util.ArrayList<>();
+        String[][] rows = {
+                {"diamond", "DIAMOND", "260", "300"},
+                {"iron_ingot", "IRON_INGOT", "18", "500"},
+                {"gold_ingot", "GOLD_INGOT", "42", "260"},
+                {"cobblestone", "COBBLESTONE", "0.65", ""},
+                {"emerald", "EMERALD", "120", "80"},
+                {"redstone", "REDSTONE", "4", "600"},
+                {"oak_log", "OAK_LOG", "6", "900"},
+                {"coal", "COAL", "8", "700"}
+        };
+        for (String[] row : rows) {
+            ItemData item = new ItemData();
+            item.id = row[0];
+            item.material = row[1];
+            item.buy = row[2];
+            item.stock = row[3];
+            samples.add(item);
         }
-        table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-        JScrollPane tableScroll = new JScrollPane(table);
+        grid.setItems(samples);
+
+        JScrollPane tableScroll = new JScrollPane(grid);
         tableScroll.setBorder(McTheme.slotBorder());
         tableScroll.getViewport().setBackground(McTheme.PANEL);
         tableScroll.getViewport().setOpaque(true);
         tableScroll.setOpaque(false);
 
         JPanel itemsCard = McTheme.card();
-        itemsCard.add(McTheme.label("商品列表", McTheme.GOLD), BorderLayout.NORTH);
+        itemsCard.add(McTheme.label("商品背包", McTheme.GOLD), BorderLayout.NORTH);
         itemsCard.add(tableScroll, BorderLayout.CENTER);
         JPanel itemButtons = McTheme.panel(new FlowLayout(FlowLayout.LEFT, 8, 6));
         itemButtons.add(McTheme.button("添加商品"));
-        itemButtons.add(McTheme.button("编辑商品"));
-        itemButtons.add(McTheme.button("删除商品"));
+        itemButtons.add(McTheme.button("编辑选中"));
+        itemButtons.add(McTheme.button("删除选中"));
         itemsCard.add(itemButtons, BorderLayout.SOUTH);
 
         JPanel right = McTheme.panel(new BorderLayout(0, 8));

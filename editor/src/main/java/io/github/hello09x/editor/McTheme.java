@@ -26,10 +26,25 @@ public final class McTheme {
     public static final Color BORDER_LIGHT = new Color(0xFFFFFF);
     public static final Color BORDER_DARK = new Color(0x373737);
 
-    public static final Font FONT = new Font("Microsoft YaHei UI", Font.PLAIN, 13);
-    public static final Font FONT_BOLD = new Font("Microsoft YaHei UI", Font.BOLD, 13);
-    public static final Font TITLE = new Font("Microsoft YaHei UI", Font.BOLD, 20);
-    public static final Font MONO = new Font("Consolas", Font.PLAIN, 13);
+    public static final Font FONT = new Font(pickFont("Microsoft YaHei UI", "Microsoft YaHei", "SimHei",
+            "Noto Sans CJK SC", "Dialog"), Font.PLAIN, 13);
+    public static final Font FONT_BOLD = new Font(FONT.getFamily(), Font.BOLD, 13);
+    public static final Font TITLE = new Font(FONT.getFamily(), Font.BOLD, 20);
+    public static final Font MONO = new Font(pickFont("Consolas", "Monospaced"), Font.PLAIN, 13);
+
+    private static String pickFont(String... candidates) {
+        try {
+            var available = java.util.Set.of(GraphicsEnvironment.getLocalGraphicsEnvironment()
+                    .getAvailableFontFamilyNames());
+            for (String candidate : candidates) {
+                if (available.contains(candidate)) {
+                    return candidate;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return "Dialog";
+    }
 
     private static TexturePaint texture;
 
