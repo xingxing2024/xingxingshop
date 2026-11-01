@@ -12,14 +12,16 @@ import java.util.function.Consumer;
  * 类似玩家背包的物品格子。
  * 左键点击直接打开编辑，格子里显示物品图标、名称和价格。
  */
-public final class ItemGridPanel extends JPanel implements Scrollable {
+public final class ItemGridPanel extends JPanel {
 
     private static final int COLUMNS = 9;
     private static final int SLOT_W = 64;
     private static final int SLOT_H = 78;
+    private static final int PAGE_SIZE = COLUMNS * 4;
 
     private final List<ItemData> items = new ArrayList<>();
     private int selected = -1;
+    private int page = 1;
     private Consumer<ItemData> onEdit = item -> {
     };
     private boolean selling;
@@ -50,46 +52,47 @@ public final class ItemGridPanel extends JPanel implements Scrollable {
         return selected >= 0 && selected < items.size() ? items.get(selected) : null;
     }
 
+    public int page() {
+        return page;
+    }
+
+    public int pages() {
+        return Math.max(1, (items.size() + PAGE_SIZE - 1) / PAGE_SIZE);
+    }
+
+    public boolean nextPage() {
+        if (page >= pages()) {
+            return false;
+        }
+        page++;
+        rebuild();
+        return true;
+    }
+
+    public boolean prevPage() {
+        if (page <= 1) {
+            return false;
+        }
+        page--;
+        rebuild();
+        return true;
+    }
+
     private void rebuild() {
         removeAll();
-        for (int i = 0; i < items.size(); i++) {
+        int pages = pages();
+        page = Math.max(1, Math.min(page, pages));
+        int from = (page - 1) * PAGE_SIZE;
+        int to = Math.min(items.size(), from + PAGE_SIZE);
+        for (int i = from; i < to; i++) {
             add(new Slot(i));
         }
-        int remainder = items.size() % COLUMNS;
-        if (remainder != 0) {
-            for (int i = 0; i < COLUMNS - remainder; i++) {
-                add(new EmptySlot());
-            }
+        for (int i = to - from; i < PAGE_SIZE; i++) {
+            add(new EmptySlot());
         }
+        setPreferredSize(new Dimension(16 + COLUMNS * (SLOT_W + 4), 16 + 4 * (SLOT_H + 4)));
         revalidate();
         repaint();
-        int rows = Math.max(1, (items.size() + COLUMNS - 1) / COLUMNS);
-        setPreferredSize(new Dimension(16 + COLUMNS * (SLOT_W + 4), 16 + rows * (SLOT_H + 4)));
-    }
-
-    @Override
-    public Dimension getPreferredScrollableViewportSize() {
-        return getPreferredSize();
-    }
-
-    @Override
-    public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
-        return 24;
-    }
-
-    @Override
-    public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
-        return Math.max(24, visibleRect.height - 48);
-    }
-
-    @Override
-    public boolean getScrollableTracksViewportWidth() {
-        return false;
-    }
-
-    @Override
-    public boolean getScrollableTracksViewportHeight() {
-        return false;
     }
 
     private final class Slot extends JComponent {
@@ -141,7 +144,15 @@ public final class ItemGridPanel extends JPanel implements Scrollable {
             }
 
             ItemData item = items.get(index);
-            drawCube(g2, w / 2 - 13, 8, item);
+            Image texture = TextureBank.get().texture(
+                    item.customItem.isBlank() ? item.material : item.customItem);
+            if (texture != null) {
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                        RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+                g2.drawImage(texture, w / 2 - 16, 5, 32, 32, null);
+            } else {
+                drawCube(g2, w / 2 - 13, 8, item);
+            }
             String name = item.displayName.isBlank() ? item.id : item.displayName;
             if (name.length() > 8) {
                 name = name.substring(0, 7) + "…";

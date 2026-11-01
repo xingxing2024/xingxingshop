@@ -34,6 +34,7 @@ public final class EditorFrame extends JFrame {
     private final JTextField openToField = new JTextField();
 
     private final JLabel status = new JLabel("请选择 shops 文件夹");
+    private final JLabel pageLabel = McTheme.label("第 1 / 1 页", McTheme.MUTED);
     private Path folder;
     private ShopData current;
 
@@ -58,6 +59,66 @@ public final class EditorFrame extends JFrame {
                 openFolder(path);
             }
         }
+        javax.swing.SwingUtilities.invokeLater(this::loadTexturesAuto);
+    }
+
+    private void loadTexturesAuto() {
+        String saved = prefs.get("client-jar", "");
+        if (!saved.isBlank()) {
+            Path path = Path.of(saved);
+            if (Files.isRegularFile(path)) {
+                loadTextures(path);
+                return;
+            }
+        }
+        Path found = TextureBank.findClientJar();
+        if (found != null) {
+            loadTextures(found);
+        } else {
+            status.setText("未找到 Minecraft 客户端，物品图标先用方块代替；点击「选择材质」指定");
+            try {
+                if (!prefs.getBoolean("asked-textures", false)) {
+                    prefs.putBoolean("asked-textures", true);
+                    int answer = JOptionPane.showConfirmDialog(this,
+                            "没有自动找到 Minecraft 客户端 jar。\n"
+                                    + "选择客户端 jar 或材质包后，商品格子会显示真实物品图标。\n"
+                                    + "现在选择吗？",
+                            "选择 Minecraft 材质", JOptionPane.YES_NO_OPTION);
+                    if (answer == JOptionPane.YES_OPTION) {
+                        chooseClientJar();
+                    }
+                }
+            } catch (Throwable ignored) {
+                // 无桌面环境时忽略
+            }
+        }
+    }
+
+    private void chooseClientJar() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("选择 Minecraft 客户端 jar 或材质包 zip");
+        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                "Minecraft jar / 材质包 zip", "jar", "zip"));
+        String saved = prefs.get("client-jar", "");
+        if (!saved.isBlank()) {
+            chooser.setSelectedFile(Path.of(saved).toFile());
+        }
+        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            loadTextures(chooser.getSelectedFile().toPath());
+        }
+    }
+
+    private void loadTextures(Path jar) {
+        try {
+            TextureBank.get().load(jar);
+            prefs.put("client-jar", jar.toString());
+            itemGrid.repaint();
+            shopList.repaint();
+            status.setText("已加载 Minecraft 材质：" + jar.getFileName());
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "加载材质失败：" + e.getMessage(),
+                    "错误", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     private JPanel buildHeader() {
@@ -78,9 +139,13 @@ public final class EditorFrame extends JFrame {
         save.addActionListener(e -> saveSettings());
         JButton saveAll = McTheme.button("保存全部");
         saveAll.addActionListener(e -> saveAll());
+        JButton textures = McTheme.button("选择材质");
+        textures.setToolTipText("选择 Minecraft 客户端 jar 或材质包 zip，用真实物品图标");
+        textures.addActionListener(e -> chooseClientJar());
         bar.add(open);
         bar.add(save);
         bar.add(saveAll);
+        bar.add(textures);
         bar.add(McTheme.label("保存后上传服务器并执行 /shop reload", McTheme.MUTED));
         header.add(bar, BorderLayout.SOUTH);
         return header;
@@ -104,12 +169,16 @@ public final class EditorFrame extends JFrame {
         save.addActionListener(e -> saveSettings());
         JMenuItem saveAll = new JMenuItem("保存全部");
         saveAll.addActionListener(e -> saveAll());
+        JMenuItem jar = new JMenuItem("选择 Minecraft 客户端 jar…");
+        jar.addActionListener(e -> chooseClientJar());
         JMenuItem exit = new JMenuItem("退出");
         exit.addActionListener(e -> dispose());
         file.add(open);
         file.addSeparator();
         file.add(save);
         file.add(saveAll);
+        file.addSeparator();
+        file.add(jar);
         file.addSeparator();
         file.add(exit);
         bar.add(file);
@@ -257,14 +326,22 @@ public final class EditorFrame extends JFrame {
 
     private JPanel buildItems() {
         itemGrid.setOnEdit(item -> editItem(item));
-        JScrollPane scroll = new JScrollPane(itemGrid);
-        scroll.setBorder(McTheme.slotBorder());
-        scroll.getViewport().setBackground(McTheme.PANEL);
-        scroll.getViewport().setOpaque(true);
-        scroll.setOpaque(false);
-        scroll.getVerticalScrollBar().setUnitIncrement(18);
+        JPanel gridWrap = McTheme.panel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        gridWrap.add(itemGrid);
 
         JPanel buttons = McTheme.panel(new FlowLayout(FlowLayout.LEFT, 8, 6));
+        JButton prev = McTheme.button("上一页");
+        prev.addActionListener(e -> {
+            if (itemGrid.prevPage()) {
+                updatePageLabel();
+            }
+        });
+        JButton next = McTheme.button("下一页");
+        next.addActionListener(e -> {
+            if (itemGrid.nextPage()) {
+                updatePageLabel();
+            }
+        });
         JButton add = McTheme.button("添加商品");
         add.addActionListener(e -> addItem());
         JButton edit = McTheme.button("编辑选中");
@@ -276,20 +353,26 @@ public final class EditorFrame extends JFrame {
         });
         JButton delete = McTheme.button("删除选中");
         delete.addActionListener(e -> deleteItem());
+        buttons.add(prev);
+        buttons.add(pageLabel);
+        buttons.add(next);
         buttons.add(add);
         buttons.add(edit);
         buttons.add(delete);
-        buttons.add(McTheme.label("左键点击格子直接编辑", McTheme.MUTED));
 
         JPanel card = McTheme.card();
-        card.add(McTheme.label("商品背包", McTheme.GOLD), BorderLayout.NORTH);
-        card.add(scroll, BorderLayout.CENTER);
+        card.add(McTheme.label("商品背包（左键格子直接编辑）", McTheme.GOLD), BorderLayout.NORTH);
+        card.add(gridWrap, BorderLayout.CENTER);
         card.add(buttons, BorderLayout.SOUTH);
 
         JPanel wrapper = McTheme.panel(new BorderLayout());
         wrapper.setBorder(new javax.swing.border.EmptyBorder(6, 6, 6, 6));
         wrapper.add(card, BorderLayout.CENTER);
         return wrapper;
+    }
+
+    private void updatePageLabel() {
+        pageLabel.setText("第 " + itemGrid.page() + " / " + itemGrid.pages() + " 页");
     }
 
     private void chooseFolder() {
@@ -352,6 +435,7 @@ public final class EditorFrame extends JFrame {
         itemGrid.setSelling(shop.selling());
         List<ItemData> items = shop.document.readItems(shop.selling());
         itemGrid.setItems(items);
+        updatePageLabel();
         status.setText(shop.file.toString() + "  ·  " + items.size() + " 件商品");
     }
 
@@ -527,14 +611,20 @@ public final class EditorFrame extends JFrame {
     private static final class ShopRenderer extends JPanel implements ListCellRenderer<ShopData> {
         private final JLabel nameLabel = new JLabel();
         private final JLabel metaLabel = new JLabel();
+        private final JLabel iconLabel = new JLabel();
 
         ShopRenderer() {
             super(new BorderLayout());
             setOpaque(true);
             nameLabel.setFont(McTheme.FONT_BOLD);
             metaLabel.setFont(McTheme.FONT.deriveFont(11f));
-            add(nameLabel, BorderLayout.CENTER);
-            add(metaLabel, BorderLayout.SOUTH);
+            iconLabel.setPreferredSize(new Dimension(30, 30));
+            add(iconLabel, BorderLayout.WEST);
+            JPanel text = new JPanel(new BorderLayout());
+            text.setOpaque(false);
+            text.add(nameLabel, BorderLayout.CENTER);
+            text.add(metaLabel, BorderLayout.SOUTH);
+            add(text, BorderLayout.CENTER);
         }
 
         @Override
@@ -549,6 +639,7 @@ public final class EditorFrame extends JFrame {
             nameLabel.setForeground(selected ? Color.WHITE : McTheme.TEXT);
             metaLabel.setText((shop.selling() ? "收购" : "购买") + " · " + shop.id);
             metaLabel.setForeground(shop.selling() ? McTheme.GOLD : McTheme.AQUA);
+            iconLabel.setIcon(TextureBank.get().icon(shop.icon, 24));
             setToolTipText(shop.file.toString());
             return this;
         }

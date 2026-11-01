@@ -11,6 +11,13 @@ import java.nio.file.Path;
 public final class ThemePreview {
 
     public static void render(Path out) throws Exception {
+        Path clientJar = TextureBank.findClientJar();
+        if (clientJar != null) {
+            try {
+                TextureBank.get().load(clientJar);
+            } catch (Exception ignored) {
+            }
+        }
         JPanel root = McTheme.panel(new BorderLayout(12, 12));
         root.setBorder(new javax.swing.border.EmptyBorder(14, 16, 14, 16));
 
@@ -97,6 +104,9 @@ public final class ThemePreview {
         itemsCard.add(McTheme.label("商品背包", McTheme.GOLD), BorderLayout.NORTH);
         itemsCard.add(tableScroll, BorderLayout.CENTER);
         JPanel itemButtons = McTheme.panel(new FlowLayout(FlowLayout.LEFT, 8, 6));
+        itemButtons.add(McTheme.button("上一页"));
+        itemButtons.add(McTheme.label("第 1 / 1 页", McTheme.MUTED));
+        itemButtons.add(McTheme.button("下一页"));
         itemButtons.add(McTheme.button("添加商品"));
         itemButtons.add(McTheme.button("编辑选中"));
         itemButtons.add(McTheme.button("删除选中"));
