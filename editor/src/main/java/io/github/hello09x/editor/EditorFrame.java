@@ -41,14 +41,16 @@ public final class EditorFrame extends JFrame {
     public EditorFrame() {
         super("XingXingShop 商店编辑器");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setSize(1180, 760);
-        setMinimumSize(new Dimension(980, 640));
+        setSize(1180, 780);
+        setMinimumSize(new Dimension(1000, 660));
         setLocationRelativeTo(null);
+        setContentPane(McTheme.panel(new BorderLayout()));
+        getContentPane().setBackground(McTheme.BG);
 
         setJMenuBar(buildMenu());
-        add(buildToolbar(), BorderLayout.NORTH);
+        add(buildHeader(), BorderLayout.NORTH);
         add(buildBody(), BorderLayout.CENTER);
-        add(status, BorderLayout.SOUTH);
+        add(buildStatus(), BorderLayout.SOUTH);
 
         String last = prefs.get("folder", "");
         if (!last.isBlank()) {
@@ -57,6 +59,41 @@ public final class EditorFrame extends JFrame {
                 openFolder(path);
             }
         }
+    }
+
+    private JPanel buildHeader() {
+        JPanel header = McTheme.panel(new BorderLayout());
+        header.setBorder(new javax.swing.border.EmptyBorder(10, 12, 6, 12));
+
+        JPanel titleRow = McTheme.panel(new BorderLayout());
+        JLabel title = McTheme.title("★ XINGXINGSHOP 商店编辑器");
+        JLabel subtitle = McTheme.label("可视化编辑插件商店 · 保存保留注释", McTheme.MUTED);
+        titleRow.add(title, BorderLayout.WEST);
+        titleRow.add(subtitle, BorderLayout.EAST);
+        header.add(titleRow, BorderLayout.NORTH);
+
+        JPanel bar = McTheme.panel(new FlowLayout(FlowLayout.LEFT, 8, 8));
+        JButton open = McTheme.button("打开文件夹");
+        open.addActionListener(e -> chooseFolder());
+        JButton save = McTheme.button("保存当前");
+        save.addActionListener(e -> saveSettings());
+        JButton saveAll = McTheme.button("保存全部");
+        saveAll.addActionListener(e -> saveAll());
+        bar.add(open);
+        bar.add(save);
+        bar.add(saveAll);
+        bar.add(McTheme.label("保存后上传服务器并执行 /shop reload", McTheme.MUTED));
+        header.add(bar, BorderLayout.SOUTH);
+        return header;
+    }
+
+    private JPanel buildStatus() {
+        JPanel panel = McTheme.panel(new BorderLayout());
+        panel.setBorder(new javax.swing.border.EmptyBorder(4, 12, 6, 12));
+        status.setFont(McTheme.FONT_BOLD);
+        status.setForeground(McTheme.GREEN);
+        panel.add(status, BorderLayout.WEST);
+        return panel;
     }
 
     private JMenuBar buildMenu() {
@@ -91,66 +128,86 @@ public final class EditorFrame extends JFrame {
         return bar;
     }
 
-    private JPanel buildToolbar() {
-        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
-        JButton open = new JButton("打开文件夹");
-        open.addActionListener(e -> chooseFolder());
-        JButton save = new JButton("保存当前");
-        save.addActionListener(e -> saveSettings());
-        JButton saveAll = new JButton("保存全部");
-        saveAll.addActionListener(e -> saveAll());
-        bar.add(open);
-        bar.add(save);
-        bar.add(saveAll);
-        bar.add(new JLabel("  （保存后会生成 .bak 备份，上传服务器后执行 /shop reload）"));
-        return bar;
-    }
-
     private JSplitPane buildBody() {
-        shopList.setCellRenderer(new DefaultListCellRenderer() {
-            @Override
-            public Component getListCellRendererComponent(JList<?> list, Object value, int index,
-                                                          boolean selected, boolean focus) {
-                ShopData shop = (ShopData) value;
-                JLabel label = (JLabel) super.getListCellRendererComponent(list,
-                        shop.name + "  [" + shop.type + "]", index, selected, focus);
-                label.setToolTipText(shop.id + " · " + shop.file);
-                return label;
-            }
-        });
+        shopList.setCellRenderer(new ShopRenderer());
+        shopList.setFixedCellHeight(44);
+        shopList.setOpaque(false);
         shopList.addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 selectShop(shopList.getSelectedValue());
             }
         });
 
-        JPanel left = new JPanel(new BorderLayout(4, 4));
-        left.setPreferredSize(new Dimension(280, 0));
-        left.add(new JScrollPane(shopList), BorderLayout.CENTER);
+        JScrollPane listScroll = new JScrollPane(shopList);
+        listScroll.setBorder(McTheme.slotBorder());
+        listScroll.getViewport().setOpaque(false);
+        listScroll.setOpaque(false);
 
-        JPanel leftButtons = new JPanel(new GridLayout(0, 1, 4, 4));
-        JButton create = new JButton("新建商店");
+        JPanel left = McTheme.card();
+        left.setPreferredSize(new Dimension(300, 0));
+        left.add(McTheme.label("商店列表", McTheme.GOLD), BorderLayout.NORTH);
+        left.add(listScroll, BorderLayout.CENTER);
+
+        JPanel leftButtons = McTheme.panel(new GridLayout(0, 1, 6, 6));
+        JButton create = McTheme.button("新建商店");
         create.addActionListener(e -> createShop());
-        JButton delete = new JButton("删除商店");
+        JButton delete = McTheme.button("删除商店");
         delete.addActionListener(e -> deleteShop());
-        JButton refresh = new JButton("刷新列表");
+        JButton refresh = McTheme.button("刷新列表");
         refresh.addActionListener(e -> reloadFolder());
         leftButtons.add(create);
         leftButtons.add(delete);
         leftButtons.add(refresh);
         left.add(leftButtons, BorderLayout.SOUTH);
 
-        JTabbedPane tabs = new JTabbedPane();
-        tabs.addTab("商店设置", buildSettings());
-        tabs.addTab("商品", buildItems());
+        CardLayout cards = new CardLayout();
+        JPanel cardPanel = new JPanel(cards);
+        cardPanel.setOpaque(false);
+        cardPanel.add(buildSettings(), "settings");
+        cardPanel.add(buildItems(), "items");
 
-        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, tabs);
-        split.setDividerLocation(280);
+        JButton tabSettings = McTheme.button("商店设置");
+        JButton tabItems = McTheme.button("商品列表");
+        JPanel nav = McTheme.panel(new FlowLayout(FlowLayout.LEFT, 8, 4));
+        nav.add(tabSettings);
+        nav.add(tabItems);
+        tabSettings.addActionListener(e -> {
+            cards.show(cardPanel, "settings");
+            tabSettings.setForeground(McTheme.GOLD);
+            tabItems.setForeground(Color.WHITE);
+        });
+        tabItems.addActionListener(e -> {
+            cards.show(cardPanel, "items");
+            tabItems.setForeground(McTheme.GOLD);
+            tabSettings.setForeground(Color.WHITE);
+        });
+        tabSettings.setForeground(McTheme.GOLD);
+
+        JPanel right = McTheme.panel(new BorderLayout());
+        right.add(nav, BorderLayout.NORTH);
+        right.add(cardPanel, BorderLayout.CENTER);
+
+        JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, left, right);
+        split.setDividerLocation(300);
+        split.setBorder(null);
+        split.setOpaque(false);
+        split.setDividerSize(6);
         return split;
     }
 
     private JPanel buildSettings() {
-        JPanel form = new JPanel(new GridBagLayout());
+        McTheme.field(idField);
+        McTheme.field(nameField);
+        McTheme.field(iconField);
+        McTheme.field(permissionField);
+        McTheme.field(openFromField);
+        McTheme.field(openToField);
+        typeBox.setBackground(McTheme.SLOT);
+        typeBox.setForeground(McTheme.TEXT);
+        typeBox.setFont(McTheme.FONT);
+
+        JPanel form = McTheme.panel(new GridBagLayout());
+        form.setBorder(new javax.swing.border.EmptyBorder(8, 12, 8, 12));
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(5, 6, 5, 6);
         c.anchor = GridBagConstraints.WEST;
@@ -164,23 +221,27 @@ public final class EditorFrame extends JFrame {
         y = row(form, c, y, "活动开始", openFromField);
         y = row(form, c, y, "活动结束", openToField);
 
-        JButton save = new JButton("保存商店设置");
+        JButton save = McTheme.button("保存商店设置");
         save.addActionListener(e -> saveSettings());
         c.gridx = 1;
         c.gridy = y;
         c.weightx = 0;
         form.add(save, c);
 
-        JLabel tip = new JLabel("时间格式：2026-12-31 23:59，留空表示不限");
-        tip.setForeground(Color.GRAY);
+        JLabel tip = McTheme.label("时间格式：2026-12-31 23:59，留空表示不限", McTheme.MUTED);
         c.gridx = 0;
         c.gridy = y + 1;
         c.gridwidth = 2;
         form.add(tip, c);
 
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.add(form, BorderLayout.NORTH);
-        return panel;
+        JPanel card = McTheme.card();
+        card.add(McTheme.label("商店设置", McTheme.GOLD), BorderLayout.NORTH);
+        card.add(form, BorderLayout.CENTER);
+
+        JPanel wrapper = McTheme.panel(new BorderLayout());
+        wrapper.setBorder(new javax.swing.border.EmptyBorder(6, 6, 6, 6));
+        wrapper.add(card, BorderLayout.NORTH);
+        return wrapper;
     }
 
     private int row(JPanel form, GridBagConstraints c, int y, String label, JComponent field) {
@@ -188,7 +249,7 @@ public final class EditorFrame extends JFrame {
         c.gridy = y;
         c.weightx = 0;
         c.gridwidth = 1;
-        form.add(new JLabel(label), c);
+        form.add(McTheme.label(label, McTheme.MUTED), c);
         c.gridx = 1;
         c.weightx = 1;
         form.add(field, c);
@@ -196,15 +257,14 @@ public final class EditorFrame extends JFrame {
     }
 
     private JPanel buildItems() {
-        itemTable.setRowHeight(26);
+        McTheme.table(itemTable);
         itemTable.setAutoCreateRowSorter(true);
-        itemTable.getColumnModel().getColumn(0).setPreferredWidth(140);
-        itemTable.getColumnModel().getColumn(1).setPreferredWidth(150);
-        DefaultTableCellRenderer right = new DefaultTableCellRenderer();
-        right.setHorizontalAlignment(SwingConstants.RIGHT);
-        for (int i = 2; i < itemModel.getColumnCount(); i++) {
-            itemTable.getColumnModel().getColumn(i).setCellRenderer(right);
+        itemTable.setFillsViewportHeight(true);
+        int[] widths = {150, 170, 70, 70, 80, 70, 70, 70, 110};
+        for (int i = 0; i < widths.length && i < itemTable.getColumnCount(); i++) {
+            itemTable.getColumnModel().getColumn(i).setPreferredWidth(widths[i]);
         }
+        itemTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
         itemTable.addMouseListener(new java.awt.event.MouseAdapter() {
             @Override
             public void mouseClicked(java.awt.event.MouseEvent e) {
@@ -214,22 +274,33 @@ public final class EditorFrame extends JFrame {
             }
         });
 
-        JPanel panel = new JPanel(new BorderLayout(4, 4));
-        panel.add(new JScrollPane(itemTable), BorderLayout.CENTER);
+        JScrollPane scroll = new JScrollPane(itemTable);
+        scroll.setBorder(McTheme.slotBorder());
+        scroll.getViewport().setBackground(McTheme.PANEL);
+        scroll.getViewport().setOpaque(true);
+        scroll.setOpaque(false);
 
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
-        JButton add = new JButton("添加商品");
+        JPanel buttons = McTheme.panel(new FlowLayout(FlowLayout.LEFT, 8, 6));
+        JButton add = McTheme.button("添加商品");
         add.addActionListener(e -> addItem());
-        JButton edit = new JButton("编辑商品");
+        JButton edit = McTheme.button("编辑商品");
         edit.addActionListener(e -> editItem());
-        JButton delete = new JButton("删除商品");
+        JButton delete = McTheme.button("删除商品");
         delete.addActionListener(e -> deleteItem());
         buttons.add(add);
         buttons.add(edit);
         buttons.add(delete);
-        buttons.add(new JLabel("  双击商品可编辑"));
-        panel.add(buttons, BorderLayout.SOUTH);
-        return panel;
+        buttons.add(McTheme.label("双击商品可编辑", McTheme.MUTED));
+
+        JPanel card = McTheme.card();
+        card.add(McTheme.label("商品列表", McTheme.GOLD), BorderLayout.NORTH);
+        card.add(scroll, BorderLayout.CENTER);
+        card.add(buttons, BorderLayout.SOUTH);
+
+        JPanel wrapper = McTheme.panel(new BorderLayout());
+        wrapper.setBorder(new javax.swing.border.EmptyBorder(6, 6, 6, 6));
+        wrapper.add(card, BorderLayout.CENTER);
+        return wrapper;
     }
 
     private void chooseFolder() {
@@ -465,6 +536,37 @@ public final class EditorFrame extends JFrame {
         } catch (Exception e) {
             JOptionPane.showMessageDialog(this, "删除失败：" + e.getMessage(),
                     "错误", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    /** 商店列表的 Minecraft 槽位样式。 */
+    private static final class ShopRenderer extends JPanel implements ListCellRenderer<ShopData> {
+        private final JLabel nameLabel = new JLabel();
+        private final JLabel metaLabel = new JLabel();
+
+        ShopRenderer() {
+            super(new BorderLayout());
+            setOpaque(true);
+            nameLabel.setFont(McTheme.FONT_BOLD);
+            metaLabel.setFont(McTheme.FONT.deriveFont(11f));
+            add(nameLabel, BorderLayout.CENTER);
+            add(metaLabel, BorderLayout.SOUTH);
+        }
+
+        @Override
+        public Component getListCellRendererComponent(JList<? extends ShopData> list, ShopData shop,
+                                                      int index, boolean selected, boolean focus) {
+            setBackground(selected ? new Color(0x5A8A3A) : new Color(0xC6C6C6));
+            setBorder(javax.swing.BorderFactory.createCompoundBorder(
+                    javax.swing.BorderFactory.createLineBorder(
+                            selected ? new Color(0x2E7D32) : new Color(0x8B8B8B), 1),
+                    new javax.swing.border.EmptyBorder(4, 8, 4, 8)));
+            nameLabel.setText(shop.name);
+            nameLabel.setForeground(selected ? Color.WHITE : McTheme.TEXT);
+            metaLabel.setText((shop.selling() ? "收购" : "购买") + " · " + shop.id);
+            metaLabel.setForeground(shop.selling() ? McTheme.GOLD : McTheme.AQUA);
+            setToolTipText(shop.file.toString());
+            return this;
         }
     }
 

@@ -14,10 +14,20 @@ public final class EditorMain {
         if (args.length > 1 && args[0].equalsIgnoreCase("--validate")) {
             System.exit(validate(Path.of(args[1])));
         }
+        if (args.length > 1 && args[0].equalsIgnoreCase("--preview")) {
+            try {
+                McTheme.install();
+                ThemePreview.render(Path.of(args[1]));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return;
+        }
         try {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception ignored) {
         }
+        McTheme.install();
         SwingUtilities.invokeLater(() -> new EditorFrame().setVisible(true));
     }
 

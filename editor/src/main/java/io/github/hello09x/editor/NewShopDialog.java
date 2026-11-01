@@ -14,7 +14,15 @@ public final class NewShopDialog extends JDialog {
 
     private NewShopDialog(Frame owner) {
         super(owner, "新建商店", true);
-        JPanel form = new JPanel(new GridBagLayout());
+        McTheme.field(idField);
+        McTheme.field(nameField);
+        McTheme.field(iconField);
+        typeBox.setBackground(McTheme.SLOT);
+        typeBox.setForeground(McTheme.TEXT);
+        typeBox.setFont(McTheme.FONT);
+
+        JPanel form = McTheme.panel(new GridBagLayout());
+        form.setBorder(new javax.swing.border.EmptyBorder(8, 12, 8, 12));
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(4, 4, 4, 4);
         c.anchor = GridBagConstraints.WEST;
@@ -23,17 +31,20 @@ public final class NewShopDialog extends JDialog {
         add(form, c, 2, "图标材质", iconField);
         add(form, c, 3, "类型", typeBox);
 
-        JButton ok = new JButton("创建");
-        JButton cancel = new JButton("取消");
+        JButton ok = McTheme.button("创建");
+        JButton cancel = McTheme.button("取消");
         ok.addActionListener(e -> create());
         cancel.addActionListener(e -> dispose());
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel buttons = McTheme.panel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
         buttons.add(cancel);
         buttons.add(ok);
 
-        setLayout(new BorderLayout(8, 8));
-        add(form, BorderLayout.CENTER);
-        add(buttons, BorderLayout.SOUTH);
+        JPanel root = McTheme.panel(new BorderLayout(8, 8));
+        root.setBorder(new javax.swing.border.EmptyBorder(10, 12, 10, 12));
+        root.add(McTheme.label("◆ 新建商店", McTheme.GOLD), BorderLayout.NORTH);
+        root.add(form, BorderLayout.CENTER);
+        root.add(buttons, BorderLayout.SOUTH);
+        setContentPane(root);
         getRootPane().setDefaultButton(ok);
         pack();
         setLocationRelativeTo(owner);
@@ -43,7 +54,7 @@ public final class NewShopDialog extends JDialog {
         c.gridx = 0;
         c.gridy = y;
         c.weightx = 0;
-        form.add(new JLabel(label), c);
+        form.add(McTheme.label(label, McTheme.MUTED), c);
         c.gridx = 1;
         c.weightx = 1;
         form.add(field, c);

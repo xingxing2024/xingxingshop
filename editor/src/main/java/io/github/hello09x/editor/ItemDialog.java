@@ -64,7 +64,20 @@ public final class ItemDialog extends JDialog {
         loreArea.setText(item.lore);
         loreArea.setLineWrap(true);
 
-        JPanel form = new JPanel(new GridBagLayout());
+        JPanel form = McTheme.panel(new GridBagLayout());
+        form.setBorder(new javax.swing.border.EmptyBorder(8, 12, 8, 12));
+        for (JTextField field : java.util.List.of(idField, materialField, customItemField, nameField,
+                buyField, sellField, stockField, limitField, sellLimitField, restockField,
+                restockIntervalField, discountField, discountStartField, discountUntilField,
+                vipPriceField, vipPermissionField, currencyField, permissionField, slotField,
+                modelDataField)) {
+            McTheme.field(field);
+        }
+        McTheme.area(loreArea);
+        dynamicBox.setOpaque(false);
+        dynamicBox.setForeground(McTheme.TEXT);
+        glowBox.setOpaque(false);
+        glowBox.setForeground(McTheme.TEXT);
         GridBagConstraints c = new GridBagConstraints();
         c.insets = new Insets(3, 4, 3, 4);
         c.anchor = GridBagConstraints.WEST;
@@ -102,21 +115,28 @@ public final class ItemDialog extends JDialog {
         y = row(form, c, y, "", dynamicBox);
         y = row(form, c, y, "", glowBox);
 
-        JButton ok = new JButton("保存");
-        JButton cancel = new JButton("取消");
+        JButton ok = McTheme.button("保存");
+        JButton cancel = McTheme.button("取消");
         ok.addActionListener(e -> save());
         cancel.addActionListener(e -> dispose());
-        JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel buttons = McTheme.panel(new FlowLayout(FlowLayout.RIGHT, 8, 8));
         buttons.add(cancel);
         buttons.add(ok);
 
         JScrollPane scroll = new JScrollPane(form);
+        scroll.setBorder(McTheme.slotBorder());
+        scroll.getViewport().setOpaque(false);
+        scroll.setOpaque(false);
         scroll.getVerticalScrollBar().setUnitIncrement(16);
-        setLayout(new BorderLayout(8, 8));
-        add(scroll, BorderLayout.CENTER);
-        add(buttons, BorderLayout.SOUTH);
+
+        JPanel root = McTheme.panel(new BorderLayout(8, 8));
+        root.setBorder(new javax.swing.border.EmptyBorder(10, 12, 10, 12));
+        root.add(McTheme.label(isNew ? "◆ 添加商品" : "◆ 编辑商品", McTheme.GOLD), BorderLayout.NORTH);
+        root.add(scroll, BorderLayout.CENTER);
+        root.add(buttons, BorderLayout.SOUTH);
+        setContentPane(root);
         getRootPane().setDefaultButton(ok);
-        setSize(560, 720);
+        setSize(580, 760);
         setLocationRelativeTo(owner);
     }
 
@@ -125,7 +145,8 @@ public final class ItemDialog extends JDialog {
         c.gridy = y++;
         c.gridwidth = 2;
         JLabel label = new JLabel("— " + title + " —");
-        label.setForeground(new Color(0x3B6EA5));
+        label.setForeground(McTheme.GOLD);
+        label.setFont(McTheme.FONT_BOLD);
         form.add(label, c);
         c.gridwidth = 1;
         return y;
@@ -136,7 +157,7 @@ public final class ItemDialog extends JDialog {
         c.gridy = y;
         c.weightx = 0;
         c.gridwidth = 1;
-        form.add(new JLabel(label), c);
+        form.add(McTheme.label(label, McTheme.MUTED), c);
         c.gridx = 1;
         c.weightx = 1;
         form.add(field, c);
