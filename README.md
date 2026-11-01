@@ -96,6 +96,22 @@ plugins/XingXingShop/
 
 ---
 
+## 商店编辑器（Windows，可选）
+
+Releases 里附带独立商店编辑器：
+
+- 下载 `XingXingShopEditor-1.0.0-windows-x64.zip`，解压后运行 `XingXingShopEditor.exe`
+- 不需要安装 Java（已自带运行环境）
+- 选择服务器的 `plugins/XingXingShop/shops` 文件夹
+- 可视化编辑商店名称、图标、类型、权限、活动时间，以及商品增删和全部字段
+- 保存会**保留 YAML 注释**，并生成 `.bak` 备份
+- 保存后把文件上传回服务器，执行 `/shop reload`
+
+源码在 [`editor/`](editor/README.md)。
+
+---
+
+
 ## 玩家命令
 
 ```text
