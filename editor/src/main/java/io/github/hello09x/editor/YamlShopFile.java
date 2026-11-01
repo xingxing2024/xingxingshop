@@ -357,6 +357,9 @@ public final class YamlShopFile {
     private MappingNode itemsMap(boolean create) {
         Node node = findNode(root, "items");
         if (node instanceof MappingNode map) {
+            if (create && map.getFlowStyle() != DumperOptions.FlowStyle.BLOCK) {
+                map.setFlowStyle(DumperOptions.FlowStyle.BLOCK);
+            }
             return map;
         }
         if (!create) {

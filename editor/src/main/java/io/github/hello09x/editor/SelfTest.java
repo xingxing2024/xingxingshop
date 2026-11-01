@@ -70,6 +70,24 @@ public final class SelfTest {
             check("重新加载商品数", reloaded.readItems(false).size() == 2);
             check("重新加载名称", reloaded.readShop().name.equals("新的名字"));
 
+            // 新建商店 + 添加商品，检查 items: {} 会变成块状
+            Path created = dir.resolve("created.yml");
+            ShopData blank = new ShopData();
+            blank.id = "created";
+            blank.name = "新建商店";
+            blank.type = "BUY";
+            blank.icon = "CHEST";
+            YamlShopFile createdDoc = YamlShopFile.create(created, blank);
+            ItemData fresh = new ItemData();
+            fresh.id = "stone";
+            fresh.material = "STONE";
+            fresh.buy = "1";
+            createdDoc.addItem(fresh, false);
+            createdDoc.save();
+            String createdText = Files.readString(created, StandardCharsets.UTF_8);
+            check("新商店改为块状 items", createdText.contains("items:\n  stone:"));
+            check("新商店商品可读", new YamlShopFile(created).readItems(false).size() == 1);
+
             delete(dir);
             System.out.println("SELFTEST PASS");
             return 0;
